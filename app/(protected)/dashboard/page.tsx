@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { StatCard } from "@/components/ui/stat-card";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
 import { getDashboardData } from "@/lib/data/pharmacy";
-import { formatCurrency, formatNumber, formatPaymentLabel } from "@/lib/utils";
+import { formatCurrency, formatNumber, formatPaymentLabel, formatQuantity } from "@/lib/utils";
 
 export default async function DashboardPage() {
   const data = await getDashboardData();
@@ -23,7 +23,7 @@ export default async function DashboardPage() {
         {data.profile.role === "admin" ? (
           <StatCard title="Inventory value" value={formatCurrency(data.metrics.inventoryValue, currency)} helper="Based on current purchase cost" trend="neutral" />
         ) : (
-          <StatCard title="Stock units" value={formatNumber(data.metrics.totalUnits)} helper="Total units across active batches" trend="neutral" />
+          <StatCard title="Stock units" value={formatQuantity(data.metrics.totalUnits)} helper="Total units across active batches" trend="neutral" />
         )}
         <StatCard title="Operational alerts" value={formatNumber(data.metrics.lowStockCount + data.metrics.expiringCount)} helper="Low stock and expiring batches" trend="down" />
       </section>
@@ -60,7 +60,7 @@ export default async function DashboardPage() {
                       <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{item.category}</p>
                     </TableCell>
                     <TableCell>{item.batch_number}</TableCell>
-                    <TableCell>{item.stock_quantity}</TableCell>
+                    <TableCell>{formatQuantity(item.stock_quantity)}</TableCell>
                     <TableCell>
                       <Badge variant="danger">Low stock</Badge>
                     </TableCell>
@@ -93,7 +93,7 @@ export default async function DashboardPage() {
                       <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Batch {item.batch_number}</p>
                     </TableCell>
                     <TableCell>{item.expiry_date}</TableCell>
-                    <TableCell>{item.stock_quantity}</TableCell>
+                    <TableCell>{formatQuantity(item.stock_quantity)}</TableCell>
                     <TableCell>{item.rx_required ? <Badge variant="warning">Rx</Badge> : <Badge variant="success">OTC</Badge>}</TableCell>
                   </TableRow>
                 ))}

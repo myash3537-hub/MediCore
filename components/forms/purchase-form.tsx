@@ -190,7 +190,7 @@ export function PurchaseForm({
                   <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <Input placeholder="Batch number" value={row.batch_number} onChange={(event) => updateRow(row.id, { batch_number: event.target.value })} />
                     <Input type="date" value={row.expiry_date} onChange={(event) => updateRow(row.id, { expiry_date: event.target.value })} />
-                    <Input type="number" min={1} value={row.quantity} onChange={(event) => updateRow(row.id, { quantity: Number(event.target.value) || 1 })} />
+                    <Input type="number" min={0.01} step="0.01" value={row.quantity} onChange={(event) => updateRow(row.id, { quantity: Number(event.target.value) || 1 })} />
                     <Input type="number" min={0} step="0.01" value={row.purchase_price} onChange={(event) => updateRow(row.id, { purchase_price: Number(event.target.value) || 0 })} />
                     <Input type="number" min={0} step="0.01" value={row.selling_price} onChange={(event) => updateRow(row.id, { selling_price: Number(event.target.value) || 0 })} />
                     <Input type="number" min={0} value={row.low_stock_threshold} onChange={(event) => updateRow(row.id, { low_stock_threshold: Number(event.target.value) || defaultLowStockThreshold })} />

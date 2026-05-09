@@ -8,7 +8,59 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
 import { requireAuthenticated } from "@/lib/auth";
 import { getInventorySnapshot, getStoreSettings, getSuppliers } from "@/lib/data/pharmacy";
-import { formatCurrency } from "@/lib/utils";
+import { InventorySnapshotRow } from "@/lib/types";
+import { formatCurrency, formatQuantity } from "@/lib/utils";
+
+type InventoryGroup = {
+  medicine_id: string;
+  medicine_name: string;
+  category: string;
+  rx_required: boolean;
+  total_stock_quantity: number;
+  low_stock_batches: number;
+  batches: InventorySnapshotRow[];
+};
+
+function formatPriceRange(values: number[], currency: string) {
+  const sortedValues = Array.from(new Set(values)).sort((left, right) => left - right);
+
+  if (!sortedValues.length) {
+    return formatCurrency(0, currency);
+  }
+
+  if (sortedValues.length === 1) {
+    return formatCurrency(sortedValues[0], currency);
+  }
+
+  return `${formatCurrency(sortedValues[0], currency)} to ${formatCurrency(sortedValues[sortedValues.length - 1], currency)}`;
+}
+
+function groupInventoryRows(rows: InventorySnapshotRow[]) {
+  const groups = new Map<string, InventoryGroup>();
+
+  rows.forEach((row) => {
+    const existing = groups.get(row.medicine_id);
+
+    if (existing) {
+      existing.total_stock_quantity += row.stock_quantity;
+      existing.low_stock_batches += row.is_low_stock ? 1 : 0;
+      existing.batches.push(row);
+      return;
+    }
+
+    groups.set(row.medicine_id, {
+      medicine_id: row.medicine_id,
+      medicine_name: row.medicine_name,
+      category: row.category,
+      rx_required: row.rx_required,
+      total_stock_quantity: row.stock_quantity,
+      low_stock_batches: row.is_low_stock ? 1 : 0,
+      batches: [row]
+    });
+  });
+
+  return Array.from(groups.values());
+}
 
 export default async function InventoryPage({
   searchParams
@@ -23,6 +75,7 @@ export default async function InventoryPage({
   const [inventoryRows, suppliers, settings] = await Promise.all([getInventorySnapshot(), getSuppliers(), getStoreSettings()]);
   const currency = settings?.currency_code ?? "INR";
   const canManagePurchasePrice = profile.role === "admin";
+  const inventoryGroups = groupInventoryRows(inventoryRows);
 
   return (
     <div className="space-y-6">
@@ -67,79 +120,105 @@ export default async function InventoryPage({
       </Card>
 
       <Card>
-        <CardHeader title="Inventory overview" description="Live stock by batch with expiry and low stock visibility for faster replenishment." action={<Badge variant="success">{inventoryRows.length} active batches</Badge>} />
+        <CardHeader
+          title="Inventory overview"
+          description="Medicines are grouped once, with every active batch shown inside the same row for cleaner stock review."
+          action={<Badge variant="success">{inventoryGroups.length} medicines / {inventoryRows.length} active batches</Badge>}
+        />
         <Table>
           <TableHead>
             <tr>
               <TableHeaderCell>Medicine</TableHeaderCell>
-              <TableHeaderCell>Batch</TableHeaderCell>
-              <TableHeaderCell>Expiry</TableHeaderCell>
-              <TableHeaderCell>Stock</TableHeaderCell>
+              <TableHeaderCell>Batches</TableHeaderCell>
+              <TableHeaderCell>Total stock</TableHeaderCell>
               <TableHeaderCell>Pricing</TableHeaderCell>
               <TableHeaderCell>Status</TableHeaderCell>
               <TableHeaderCell>Actions</TableHeaderCell>
             </tr>
           </TableHead>
           <TableBody>
-            {inventoryRows.map((item) => (
-              <TableRow key={item.batch_id}>
+            {inventoryGroups.map((group) => (
+              <TableRow key={group.medicine_id}>
                 <TableCell>
-                  <p className="font-semibold text-slate-950">{item.medicine_name}</p>
-                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{item.category}</p>
+                  <p className="font-semibold text-slate-950">{group.medicine_name}</p>
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{group.category}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge variant="accent">{group.batches.length} batch{group.batches.length === 1 ? "" : "es"}</Badge>
+                    {group.rx_required ? <Badge variant="warning">Rx</Badge> : null}
+                  </div>
                 </TableCell>
                 <TableCell>
-                  <p>{item.batch_number}</p>
-                  <p className="text-xs text-slate-500">{item.supplier_name || "No supplier linked"}</p>
+                  <div className="space-y-3">
+                    {group.batches.map((batch) => (
+                      <div key={batch.batch_id} className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                        <p className="font-semibold text-slate-900">Batch {batch.batch_number}</p>
+                        <p className="mt-1 text-xs text-slate-500">{batch.supplier_name || "No supplier linked"}</p>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                          <span>Expires {batch.expiry_date}</span>
+                          <span>{formatQuantity(batch.stock_quantity)} in stock</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </TableCell>
-                <TableCell>{item.expiry_date}</TableCell>
-                <TableCell>{item.stock_quantity}</TableCell>
                 <TableCell>
-                  {canManagePurchasePrice ? <p>{formatCurrency(item.purchase_price, currency)} cost</p> : null}
-                  <p className="text-xs text-slate-500">{formatCurrency(item.selling_price, currency)} MRP</p>
+                  <p className="font-semibold text-slate-950">{formatQuantity(group.total_stock_quantity)}</p>
+                  <p className="text-xs text-slate-500">Across {group.batches.length} active batch{group.batches.length === 1 ? "" : "es"}</p>
+                </TableCell>
+                <TableCell>
+                  {canManagePurchasePrice ? <p>{formatPriceRange(group.batches.map((batch) => batch.purchase_price), currency)} cost</p> : null}
+                  <p className="text-xs text-slate-500">{formatPriceRange(group.batches.map((batch) => batch.selling_price), currency)} MRP</p>
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-2">
-                    {item.is_low_stock ? <Badge variant="danger">Low stock</Badge> : <Badge variant="success">Healthy</Badge>}
-                    {item.rx_required ? <Badge variant="warning">Rx</Badge> : null}
+                    {group.low_stock_batches ? <Badge variant="danger">{group.low_stock_batches} low stock</Badge> : <Badge variant="success">Healthy</Badge>}
+                    <Badge variant="accent">Batch-managed</Badge>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col gap-3">
-                    <details className="group rounded-2xl border border-slate-200 bg-white">
-                      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-brand-700">
-                        <PencilLine className="h-4 w-4" />
-                        Edit
-                      </summary>
-                      <div className="border-t border-slate-200 p-4">
-                        <MedicineForm
-                          suppliers={suppliers}
-                          actionLabel="Update batch"
-                          canManagePurchasePrice={canManagePurchasePrice}
-                          initial={{
-                            medicine_id: item.medicine_id,
-                            batch_id: item.batch_id,
-                            name: item.medicine_name,
-                            category: item.category,
-                            supplier_name: item.supplier_name,
-                            rx_required: item.rx_required,
-                            batch_number: item.batch_number,
-                            expiry_date: item.expiry_date,
-                            stock_quantity: item.stock_quantity,
-                            purchase_price: canManagePurchasePrice ? item.purchase_price : undefined,
-                            selling_price: item.selling_price,
-                            low_stock_threshold: item.low_stock_threshold
-                          }}
-                        />
-                      </div>
-                    </details>
+                    <div className="space-y-3">
+                      {group.batches.map((batch) => (
+                        <details key={batch.batch_id} className="group rounded-2xl border border-slate-200 bg-white">
+                          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-brand-700">
+                            <PencilLine className="h-4 w-4" />
+                            Edit batch {batch.batch_number}
+                          </summary>
+                          <div className="border-t border-slate-200 p-4">
+                            <MedicineForm
+                              suppliers={suppliers}
+                              actionLabel="Update batch"
+                              canManagePurchasePrice={canManagePurchasePrice}
+                              initial={{
+                                medicine_id: batch.medicine_id,
+                                batch_id: batch.batch_id,
+                                name: batch.medicine_name,
+                                category: batch.category,
+                                supplier_name: batch.supplier_name,
+                                rx_required: batch.rx_required,
+                                batch_number: batch.batch_number,
+                                expiry_date: batch.expiry_date,
+                                stock_quantity: batch.stock_quantity,
+                                purchase_price: canManagePurchasePrice ? batch.purchase_price : undefined,
+                                selling_price: batch.selling_price,
+                                low_stock_threshold: batch.low_stock_threshold
+                              }}
+                            />
+                          </div>
+                        </details>
+                      ))}
+                    </div>
 
                     <form action={archiveMedicineAction}>
-                      <input type="hidden" name="medicine_id" value={item.medicine_id} />
+                      <input type="hidden" name="medicine_id" value={group.medicine_id} />
                       <Button type="submit" variant="secondary" className="w-full justify-start">
                         <Archive className="h-4 w-4" />
                         Archive medicine
                       </Button>
                     </form>
+                    <p className="text-xs leading-5 text-slate-500">
+                      Archiving hides the full medicine and all of its batches together. Batches stay preserved inside sales history.
+                    </p>
                   </div>
                 </TableCell>
               </TableRow>

@@ -9,6 +9,7 @@ type MedicineFormValues = {
   batch_id?: string;
   name?: string;
   category?: string;
+  supplier_id?: string | null;
   supplier_name?: string | null;
   rx_required?: boolean;
   batch_number?: string;
@@ -57,7 +58,7 @@ export function MedicineForm({
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <label className="text-sm font-semibold text-slate-800">Supplier</label>
-          <Select name="supplier_id" defaultValue="">
+          <Select name="supplier_id" defaultValue={initial?.supplier_id ?? ""}>
             <option value="">Select supplier</option>
             {suppliers.map((supplier) => (
               <option key={supplier.id} value={supplier.id}>
@@ -83,7 +84,7 @@ export function MedicineForm({
         </div>
         <div className="space-y-2">
           <label className="text-sm font-semibold text-slate-800">Stock quantity</label>
-          <Input name="stock_quantity" type="number" min={0} defaultValue={initial?.stock_quantity ?? 0} />
+          <Input name="stock_quantity" type="number" min={0} step="0.01" defaultValue={initial?.stock_quantity ?? 0} />
         </div>
         <div className="space-y-2">
           <label className="text-sm font-semibold text-slate-800">Low stock alert</label>

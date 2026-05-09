@@ -6,7 +6,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
 import { requireAuthenticated } from "@/lib/auth";
 import { getReportsData } from "@/lib/data/pharmacy";
-import { formatCurrency, formatNumber, formatPaymentLabel } from "@/lib/utils";
+import { formatCurrency, formatNumber, formatPaymentLabel, formatQuantity } from "@/lib/utils";
 
 export default async function ReportsPage() {
   const { profile } = await requireAuthenticated();
@@ -88,7 +88,7 @@ export default async function ReportsPage() {
                 <TableRow key={row.batch_id}>
                   <TableCell>{row.medicine_name}</TableCell>
                   <TableCell>{row.batch_number}</TableCell>
-                  <TableCell>{formatNumber(row.stock_quantity)}</TableCell>
+                  <TableCell>{formatQuantity(row.stock_quantity)}</TableCell>
                   <TableCell>{formatCurrency(row.selling_price, currency)}</TableCell>
                 </TableRow>
               ))}
@@ -112,7 +112,7 @@ export default async function ReportsPage() {
                 <TableRow key={row.batch_id}>
                   <TableCell>{row.medicine_name}</TableCell>
                   <TableCell>{row.expiry_date}</TableCell>
-                  <TableCell>{row.stock_quantity}</TableCell>
+                  <TableCell>{formatQuantity(row.stock_quantity)}</TableCell>
                   <TableCell>{row.category}</TableCell>
                 </TableRow>
               ))}

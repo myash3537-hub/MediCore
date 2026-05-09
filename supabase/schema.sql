@@ -1,141 +1,141 @@
 create extension if not exists pgcrypto;
-
-do $$
-begin
-  create type public.user_role as enum ('admin', 'pharmacist');
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$
-begin
-  create type public.payment_method as enum ('Cash', 'UPI', 'Card');
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$
-begin
-  alter type public.payment_method add value 'Split';
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$
-begin
-  create type public.stock_movement_type as enum ('purchase', 'sale', 'return', 'adjustment');
-exception
-  when duplicate_object then null;
-end $$;
-
-create or replace function public.set_updated_at()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at = timezone('utc', now());
-  return new;
-end;
-$$;
-
-create table if not exists public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  email text not null unique,
-  full_name text,
-  role public.user_role not null default 'pharmacist',
-  permissions text[] not null default '{}',
-  is_active boolean not null default true,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now()),
-  last_seen_at timestamptz
-);
-
-create or replace function public.current_role()
-returns public.user_role
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select role
-  from public.profiles
-  where id = auth.uid()
-  limit 1
-$$;
-
-create or replace function public.is_admin()
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select exists (
-    select 1
-    from public.profiles
-    where id = auth.uid()
-      and role = 'admin'
-      and is_active = true
-  )
-$$;
-
-create or replace function public.is_staff()
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select exists (
-    select 1
-    from public.profiles
-    where id = auth.uid()
-      and role in ('admin', 'pharmacist')
-      and is_active = true
-  )
-$$;
-
-create or replace function public.ensure_staff_access()
-returns void
+create or replace function public.record_sale(
+  p_customer_name text,
+  p_discount_amount numeric,
+  p_tax_amount numeric,
+  p_payment_method public.payment_method,
+  p_notes text,
+  p_items jsonb,
+  p_cash_amount numeric default null,
+  p_online_amount numeric default null,
+  p_online_payment_method text default null
+)
+returns uuid
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_sale_id uuid;
+  v_item jsonb;
+  v_line_total numeric(12, 2);
+  v_subtotal numeric(12, 2) := 0;
+  v_batch_stock numeric(12, 2);
+  v_total_amount numeric(12, 2);
+  v_cash_amount numeric(12, 2) := 0;
+  v_online_amount numeric(12, 2) := 0;
+  v_online_payment_method text;
 begin
-  if auth.uid() is null then
-    raise exception 'Authentication required';
+  perform public.ensure_staff_access();
+
+  insert into public.sales (customer_name, discount_amount, tax_amount, payment_method, notes, recorded_by)
+  values (
+    nullif(trim(p_customer_name), ''),
+    coalesce(p_discount_amount, 0),
+    coalesce(p_tax_amount, 0),
+    coalesce(p_payment_method, 'Cash'),
+    p_notes,
+    auth.uid()
+  )
+  returning id into v_sale_id;
+
+  for v_item in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb))
+  loop
+    select stock_quantity
+    into v_batch_stock
+    from public.medicine_batches
+    where id = (v_item ->> 'batch_id')::uuid
+    for update;
+
+    if v_batch_stock is null then
+      raise exception 'Batch not found';
+    end if;
+
+    if v_batch_stock < (v_item ->> 'quantity')::numeric(12, 2) then
+      raise exception 'Insufficient stock for selected batch';
+    end if;
+
+    v_line_total := ((v_item ->> 'quantity')::numeric(12, 2) * (v_item ->> 'unit_price')::numeric(12, 2));
+    v_subtotal := v_subtotal + v_line_total;
+
+    update public.medicine_batches
+    set stock_quantity = stock_quantity - (v_item ->> 'quantity')::numeric(12, 2)
+    where id = (v_item ->> 'batch_id')::uuid;
+
+    insert into public.sale_items (
+      sale_id,
+      medicine_id,
+      batch_id,
+      quantity,
+      unit_price,
+      line_total
+    )
+    values (
+      v_sale_id,
+      (v_item ->> 'medicine_id')::uuid,
+      (v_item ->> 'batch_id')::uuid,
+      (v_item ->> 'quantity')::numeric(12, 2),
+      (v_item ->> 'unit_price')::numeric(12, 2),
+      v_line_total
+    );
+
+    insert into public.stock_movements (medicine_id, batch_id, movement_type, quantity, reference_id, notes, created_by)
+    values (
+      (v_item ->> 'medicine_id')::uuid,
+      (v_item ->> 'batch_id')::uuid,
+      'sale',
+      -1 * (v_item ->> 'quantity')::numeric(12, 2),
+      v_sale_id,
+      'POS sale',
+      auth.uid()
+    );
+  end loop;
+
+  update public.sales
+  set subtotal = v_subtotal,
+      total_amount = greatest(v_subtotal - coalesce(p_discount_amount, 0) + coalesce(p_tax_amount, 0), 0)
+  where id = v_sale_id;
+
+  select total_amount into v_total_amount
+  from public.sales
+  where id = v_sale_id;
+
+  if coalesce(p_payment_method, 'Cash') = 'Cash' then
+    v_cash_amount := coalesce(v_total_amount, 0);
+    v_online_amount := 0;
+    v_online_payment_method := null;
+  elsif p_payment_method in ('UPI', 'Card') then
+    v_cash_amount := 0;
+    v_online_amount := coalesce(v_total_amount, 0);
+    v_online_payment_method := p_payment_method::text;
+  elsif p_payment_method = 'Split' then
+    v_cash_amount := coalesce(p_cash_amount, 0);
+    v_online_amount := coalesce(p_online_amount, 0);
+    v_online_payment_method := nullif(trim(coalesce(p_online_payment_method, '')), '');
+
+    if v_online_payment_method not in ('UPI', 'Card') then
+      raise exception 'Select an online payment type for split payments';
+    end if;
+
+    if coalesce(v_total_amount, 0) > 0 and (v_cash_amount <= 0 or v_online_amount <= 0) then
+      raise exception 'Split payment requires both cash and online amounts';
+    end if;
+
+    if abs((v_cash_amount + v_online_amount) - coalesce(v_total_amount, 0)) > 0.01 then
+      raise exception 'Split payment amounts must add up to the amount due';
+    end if;
   end if;
 
-  if not public.is_staff() then
-    raise exception 'Insufficient permissions';
-  end if;
+  update public.sales
+  set cash_amount = v_cash_amount,
+      online_amount = v_online_amount,
+      online_payment_method = v_online_payment_method
+  where id = v_sale_id;
+
+  perform public.record_audit('sales', v_sale_id, 'created', jsonb_build_object('customer_name', p_customer_name));
+  return v_sale_id;
 end;
 $$;
-
-create table if not exists public.suppliers (
-  id uuid primary key default gen_random_uuid(),
-  name text not null unique,
-  contact_person text,
-  phone text,
-  email text,
-  address text,
-  notes text,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
-);
-
-create table if not exists public.medicines (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  category text not null,
-  default_supplier_id uuid references public.suppliers(id) on delete set null,
-  rx_required boolean not null default false,
-  description text,
-  sku text,
-  created_by uuid references public.profiles(id) on delete set null,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now()),
-  is_active boolean not null default true
 );
 
 create unique index if not exists medicines_name_unique on public.medicines (lower(name));
@@ -146,7 +146,7 @@ create table if not exists public.medicine_batches (
   supplier_id uuid references public.suppliers(id) on delete set null,
   batch_number text not null,
   expiry_date date not null,
-  stock_quantity integer not null default 0 check (stock_quantity >= 0),
+  stock_quantity numeric(12, 2) not null default 0 check (stock_quantity >= 0),
   purchase_price numeric(12, 2) not null check (purchase_price >= 0),
   selling_price numeric(12, 2) not null check (selling_price >= 0),
   low_stock_threshold integer not null default 10 check (low_stock_threshold >= 0),
@@ -173,7 +173,7 @@ create table if not exists public.purchase_items (
   purchase_id uuid not null references public.purchases(id) on delete cascade,
   medicine_id uuid not null references public.medicines(id) on delete restrict,
   batch_id uuid not null references public.medicine_batches(id) on delete restrict,
-  quantity integer not null check (quantity > 0),
+  quantity numeric(12, 2) not null check (quantity > 0),
   purchase_price numeric(12, 2) not null check (purchase_price >= 0),
   selling_price numeric(12, 2) not null check (selling_price >= 0),
   line_total numeric(12, 2) not null default 0
@@ -210,7 +210,7 @@ create table if not exists public.sale_items (
   sale_id uuid not null references public.sales(id) on delete cascade,
   medicine_id uuid not null references public.medicines(id) on delete restrict,
   batch_id uuid not null references public.medicine_batches(id) on delete restrict,
-  quantity integer not null check (quantity > 0),
+  quantity numeric(12, 2) not null check (quantity > 0),
   unit_price numeric(12, 2) not null check (unit_price >= 0),
   line_total numeric(12, 2) not null default 0
 );
@@ -230,7 +230,7 @@ create table if not exists public.sale_return_items (
   sale_return_id uuid not null references public.sales_returns(id) on delete cascade,
   sale_item_id uuid not null references public.sale_items(id) on delete restrict,
   batch_id uuid not null references public.medicine_batches(id) on delete restrict,
-  quantity integer not null check (quantity > 0),
+  quantity numeric(12, 2) not null check (quantity > 0),
   refund_amount numeric(12, 2) not null default 0
 );
 
@@ -239,7 +239,7 @@ create table if not exists public.stock_movements (
   medicine_id uuid not null references public.medicines(id) on delete restrict,
   batch_id uuid not null references public.medicine_batches(id) on delete restrict,
   movement_type public.stock_movement_type not null,
-  quantity integer not null,
+  quantity numeric(12, 2) not null,
   reference_id uuid,
   notes text,
   created_by uuid references public.profiles(id) on delete set null,
@@ -459,7 +459,7 @@ begin
       coalesce((v_item ->> 'supplier_id')::uuid, p_supplier_id),
       v_item ->> 'batch_number',
       (v_item ->> 'expiry_date')::date,
-      greatest((v_item ->> 'quantity')::integer, 0),
+      greatest((v_item ->> 'quantity')::numeric(12, 2), 0),
       (v_item ->> 'purchase_price')::numeric(12, 2),
       (v_item ->> 'selling_price')::numeric(12, 2),
       coalesce((v_item ->> 'low_stock_threshold')::integer, (select default_low_stock_threshold from public.store_settings limit 1), 10)
@@ -474,7 +474,7 @@ begin
       low_stock_threshold = excluded.low_stock_threshold
     returning id into v_batch_id;
 
-    v_line_total := ((v_item ->> 'quantity')::integer * (v_item ->> 'purchase_price')::numeric(12, 2));
+    v_line_total := ((v_item ->> 'quantity')::numeric(12, 2) * (v_item ->> 'purchase_price')::numeric(12, 2));
     v_subtotal := v_subtotal + v_line_total;
 
     insert into public.purchase_items (
@@ -490,7 +490,7 @@ begin
       v_purchase_id,
       (v_item ->> 'medicine_id')::uuid,
       v_batch_id,
-      (v_item ->> 'quantity')::integer,
+      (v_item ->> 'quantity')::numeric(12, 2),
       (v_item ->> 'purchase_price')::numeric(12, 2),
       (v_item ->> 'selling_price')::numeric(12, 2),
       v_line_total
@@ -501,7 +501,7 @@ begin
       (v_item ->> 'medicine_id')::uuid,
       v_batch_id,
       'purchase',
-      (v_item ->> 'quantity')::integer,
+      (v_item ->> 'quantity')::numeric(12, 2),
       v_purchase_id,
       concat('Purchase invoice ', coalesce(p_invoice_number, 'manual')),
       auth.uid()
@@ -515,144 +515,6 @@ begin
 
   perform public.record_audit('purchases', v_purchase_id, 'created', jsonb_build_object('invoice_number', p_invoice_number));
   return v_purchase_id;
-end;
-$$;
-
-create or replace function public.record_sale(
-  p_customer_name text,
-  p_discount_amount numeric,
-  p_tax_amount numeric,
-  p_payment_method public.payment_method,
-  p_notes text,
-  p_items jsonb,
-  p_cash_amount numeric default null,
-  p_online_amount numeric default null,
-  p_online_payment_method text default null
-)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_sale_id uuid;
-  v_item jsonb;
-  v_line_total numeric(12, 2);
-  v_subtotal numeric(12, 2) := 0;
-  v_batch_stock integer;
-  v_total_amount numeric(12, 2);
-  v_cash_amount numeric(12, 2) := 0;
-  v_online_amount numeric(12, 2) := 0;
-  v_online_payment_method text;
-begin
-  perform public.ensure_staff_access();
-
-  insert into public.sales (customer_name, discount_amount, tax_amount, payment_method, notes, recorded_by)
-  values (
-    nullif(trim(p_customer_name), ''),
-    coalesce(p_discount_amount, 0),
-    coalesce(p_tax_amount, 0),
-    coalesce(p_payment_method, 'Cash'),
-    p_notes,
-    auth.uid()
-  )
-  returning id into v_sale_id;
-
-  for v_item in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb))
-  loop
-    select stock_quantity
-    into v_batch_stock
-    from public.medicine_batches
-    where id = (v_item ->> 'batch_id')::uuid
-    for update;
-
-    if v_batch_stock is null then
-      raise exception 'Batch not found';
-    end if;
-
-    if v_batch_stock < (v_item ->> 'quantity')::integer then
-      raise exception 'Insufficient stock for selected batch';
-    end if;
-
-    v_line_total := ((v_item ->> 'quantity')::integer * (v_item ->> 'unit_price')::numeric(12, 2));
-    v_subtotal := v_subtotal + v_line_total;
-
-    update public.medicine_batches
-    set stock_quantity = stock_quantity - (v_item ->> 'quantity')::integer
-    where id = (v_item ->> 'batch_id')::uuid;
-
-    insert into public.sale_items (
-      sale_id,
-      medicine_id,
-      batch_id,
-      quantity,
-      unit_price,
-      line_total
-    )
-    values (
-      v_sale_id,
-      (v_item ->> 'medicine_id')::uuid,
-      (v_item ->> 'batch_id')::uuid,
-      (v_item ->> 'quantity')::integer,
-      (v_item ->> 'unit_price')::numeric(12, 2),
-      v_line_total
-    );
-
-    insert into public.stock_movements (medicine_id, batch_id, movement_type, quantity, reference_id, notes, created_by)
-    values (
-      (v_item ->> 'medicine_id')::uuid,
-      (v_item ->> 'batch_id')::uuid,
-      'sale',
-      -1 * (v_item ->> 'quantity')::integer,
-      v_sale_id,
-      'POS sale',
-      auth.uid()
-    );
-  end loop;
-
-  update public.sales
-  set subtotal = v_subtotal,
-      total_amount = greatest(v_subtotal - coalesce(p_discount_amount, 0) + coalesce(p_tax_amount, 0), 0)
-  where id = v_sale_id;
-
-  select total_amount into v_total_amount
-  from public.sales
-  where id = v_sale_id;
-
-  if coalesce(p_payment_method, 'Cash') = 'Cash' then
-    v_cash_amount := coalesce(v_total_amount, 0);
-    v_online_amount := 0;
-    v_online_payment_method := null;
-  elsif p_payment_method in ('UPI', 'Card') then
-    v_cash_amount := 0;
-    v_online_amount := coalesce(v_total_amount, 0);
-    v_online_payment_method := p_payment_method::text;
-  elsif p_payment_method = 'Split' then
-    v_cash_amount := coalesce(p_cash_amount, 0);
-    v_online_amount := coalesce(p_online_amount, 0);
-    v_online_payment_method := nullif(trim(coalesce(p_online_payment_method, '')), '');
-
-    if v_online_payment_method not in ('UPI', 'Card') then
-      raise exception 'Select an online payment type for split payments';
-    end if;
-
-    if coalesce(v_total_amount, 0) > 0 and (v_cash_amount <= 0 or v_online_amount <= 0) then
-      raise exception 'Split payment requires both cash and online amounts';
-    end if;
-
-    if abs((v_cash_amount + v_online_amount) - coalesce(v_total_amount, 0)) > 0.01 then
-      raise exception 'Split payment amounts must add up to the amount due';
-    end if;
-  end if;
-
-  update public.sales
-  set cash_amount = v_cash_amount,
-      online_amount = v_online_amount,
-      online_payment_method = v_online_payment_method
-  where id = v_sale_id;
-
-  perform public.record_audit('sales', v_sale_id, 'created', jsonb_build_object('customer_name', p_customer_name));
-  return v_sale_id;
 end;
 $$;
 
@@ -670,8 +532,8 @@ as $$
 declare
   v_return_id uuid;
   v_item jsonb;
-  v_sold_quantity integer;
-  v_returned_quantity integer;
+  v_sold_quantity numeric(12, 2);
+  v_returned_quantity numeric(12, 2);
   v_batch_id uuid;
 begin
   perform public.ensure_staff_access();
@@ -697,12 +559,12 @@ begin
     from public.sale_return_items
     where sale_item_id = (v_item ->> 'sale_item_id')::uuid;
 
-    if v_returned_quantity + (v_item ->> 'quantity')::integer > v_sold_quantity then
+    if v_returned_quantity + (v_item ->> 'quantity')::numeric(12, 2) > v_sold_quantity then
       raise exception 'Return quantity exceeds sold quantity';
     end if;
 
     update public.medicine_batches
-    set stock_quantity = stock_quantity + (v_item ->> 'quantity')::integer
+    set stock_quantity = stock_quantity + (v_item ->> 'quantity')::numeric(12, 2)
     where id = v_batch_id;
 
     insert into public.sale_return_items (
@@ -716,12 +578,11 @@ begin
       v_return_id,
       (v_item ->> 'sale_item_id')::uuid,
       v_batch_id,
-      (v_item ->> 'quantity')::integer,
+      (v_item ->> 'quantity')::numeric(12, 2),
       (v_item ->> 'refund_amount')::numeric(12, 2)
     );
-
     insert into public.stock_movements (medicine_id, batch_id, movement_type, quantity, reference_id, notes, created_by)
-    select medicine_id, batch_id, 'return', (v_item ->> 'quantity')::integer, v_return_id, p_reason, auth.uid()
+    select medicine_id, batch_id, 'return', (v_item ->> 'quantity')::numeric(12, 2), v_return_id, p_reason, auth.uid()
     from public.sale_items
     where id = (v_item ->> 'sale_item_id')::uuid;
   end loop;

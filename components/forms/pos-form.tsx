@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { InventorySnapshotRow, OnlinePaymentMethod, PaymentMethod, StoreSettings } from "@/lib/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatQuantity } from "@/lib/utils";
 
 type CartItem = InventorySnapshotRow & {
   quantity: number;
@@ -16,6 +16,10 @@ type CartItem = InventorySnapshotRow & {
 
 const paymentMethods: PaymentMethod[] = ["Cash", "UPI", "Card", "Split"];
 const onlinePaymentMethods: OnlinePaymentMethod[] = ["UPI", "Card"];
+
+function minimumSaleQuantity(stockQuantity: number) {
+  return stockQuantity > 0 && stockQuantity < 1 ? Number(stockQuantity.toFixed(2)) : 1;
+}
 
 export function PosForm({
   stockRows,
@@ -96,7 +100,7 @@ export function PosForm({
         ...currentCart,
         {
           ...item,
-          quantity: 1
+          quantity: minimumSaleQuantity(item.stock_quantity)
         }
       ];
     });
@@ -108,7 +112,7 @@ export function PosForm({
         entry.batch_id === batchId
           ? {
               ...entry,
-              quantity: Math.max(1, Math.min(value || 1, entry.stock_quantity))
+              quantity: Math.max(minimumSaleQuantity(entry.stock_quantity), Math.min(value || minimumSaleQuantity(entry.stock_quantity), entry.stock_quantity))
             }
           : entry
       )
@@ -186,7 +190,7 @@ export function PosForm({
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold text-slate-950">{formatCurrency(item.selling_price)}</p>
-                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{item.stock_quantity} in stock</p>
+                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{formatQuantity(item.stock_quantity)} in stock</p>
                 </div>
               </div>
             </button>
@@ -315,7 +319,7 @@ export function PosForm({
                         <button
                           type="button"
                           onClick={() => decrementQuantity(item.batch_id)}
-                          disabled={item.quantity <= 1}
+                          disabled={item.quantity <= minimumSaleQuantity(item.stock_quantity)}
                           className="flex h-12 w-12 items-center justify-center text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:text-slate-300"
                           aria-label={`Decrease quantity of ${item.medicine_name}`}
                         >
@@ -323,7 +327,7 @@ export function PosForm({
                         </button>
                         <div className="flex min-w-[4.5rem] flex-col items-center justify-center border-x border-slate-200 px-3 py-2 text-center">
                           <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Qty</span>
-                          <span className="text-lg font-semibold text-slate-950">{item.quantity}</span>
+                          <span className="text-lg font-semibold text-slate-950">{formatQuantity(item.quantity)}</span>
                         </div>
                         <button
                           type="button"

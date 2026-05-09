@@ -19,6 +19,13 @@ export function formatNumber(value: number) {
   }).format(value);
 }
 
+export function formatQuantity(value: number) {
+  return new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  }).format(Number(value ?? 0));
+}
+
 type PaymentDisplay = {
   payment_method: PaymentMethod;
   cash_amount?: number | null;

@@ -1,4 +1,4 @@
-import { formatNumber } from "@/lib/utils";
+import { formatQuantity } from "@/lib/utils";
 
 export function BarChart({
   data
@@ -13,7 +13,7 @@ export function BarChart({
         <div key={item.label} className="space-y-2">
           <div className="flex items-center justify-between gap-3">
             <p className="truncate pr-3 text-sm font-medium text-slate-700">{item.label}</p>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{formatNumber(item.value)}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{formatQuantity(item.value)}</p>
           </div>
           <div className="h-3 rounded-full bg-slate-100">
             <div
