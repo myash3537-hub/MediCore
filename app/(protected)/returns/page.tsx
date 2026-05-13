@@ -1,5 +1,6 @@
 import { RotateCcw } from "lucide-react";
 
+import { AdminReturnManager } from "@/components/forms/admin-return-manager";
 import { ReturnForm } from "@/components/forms/return-form";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -13,15 +14,23 @@ export default async function ReturnsPage({
   searchParams?: {
     error?: string;
     return?: string;
+    success?: string;
   };
 }) {
   const data = await getReturnsData();
+  const currency = data.settings?.currency_code ?? "INR";
 
   return (
     <div className="space-y-6">
       {searchParams?.error ? (
         <Card className="bg-rose-50">
           <div className="text-sm font-semibold text-rose-900">{decodeURIComponent(searchParams.error)}</div>
+        </Card>
+      ) : null}
+
+      {searchParams?.success ? (
+        <Card className="bg-brand-50">
+          <div className="text-sm font-semibold text-brand-900">{decodeURIComponent(searchParams.success)}</div>
         </Card>
       ) : null}
 
@@ -55,12 +64,23 @@ export default async function ReturnsPage({
                 <TableCell>{String((entry.sales as { customer_name?: string } | null)?.customer_name ?? "Walk-in customer")}</TableCell>
                 <TableCell>{String(entry.return_date).slice(0, 10)}</TableCell>
                 <TableCell>{String(entry.reason ?? "No reason captured")}</TableCell>
-                <TableCell>{formatCurrency(Number(entry.refund_amount ?? 0))}</TableCell>
+                <TableCell>{formatCurrency(Number(entry.refund_amount ?? 0), currency)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </Card>
+
+      {data.profile.role === "admin" ? (
+        <Card>
+          <CardHeader
+            title="Admin return controls"
+            description="Edit refund quantities, refund values, and reasons, or delete a mistaken return while keeping stock in sync."
+            action={<Badge variant="warning">Admin only</Badge>}
+          />
+          <AdminReturnManager returns={data.editableReturns} currency={currency} />
+        </Card>
+      ) : null}
     </div>
   );
 }

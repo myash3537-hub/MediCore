@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { InventorySnapshotRow, OnlinePaymentMethod, PaymentMethod, StoreSettings } from "@/lib/types";
-import { formatCurrency, formatQuantity } from "@/lib/utils";
+import { formatCurrency, formatPreciseQuantity } from "@/lib/utils";
 
 type CartItem = InventorySnapshotRow & {
   quantity: number;
@@ -190,7 +190,7 @@ export function PosForm({
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold text-slate-950">{formatCurrency(item.selling_price)}</p>
-                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{formatQuantity(item.stock_quantity)} in stock</p>
+                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{formatPreciseQuantity(item.stock_quantity)} in stock</p>
                 </div>
               </div>
             </button>
@@ -327,7 +327,7 @@ export function PosForm({
                         </button>
                         <div className="flex min-w-[4.5rem] flex-col items-center justify-center border-x border-slate-200 px-3 py-2 text-center">
                           <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Qty</span>
-                          <span className="text-lg font-semibold text-slate-950">{formatQuantity(item.quantity)}</span>
+                          <span className="text-lg font-semibold text-slate-950">{formatPreciseQuantity(item.quantity)}</span>
                         </div>
                         <button
                           type="button"
@@ -338,6 +338,16 @@ export function PosForm({
                         >
                           <Plus className="h-4 w-4" />
                         </button>
+                      </div>
+                      <div className="w-28">
+                        <Input
+                          type="number"
+                          min={minimumSaleQuantity(item.stock_quantity)}
+                          max={item.stock_quantity}
+                          step="0.01"
+                          value={item.quantity}
+                          onChange={(event) => updateQuantity(item.batch_id, Number(event.target.value) || minimumSaleQuantity(item.stock_quantity))}
+                        />
                       </div>
                       <div className="min-w-[96px] text-right text-sm font-semibold text-slate-950">
                         {formatCurrency(item.quantity * item.selling_price)}

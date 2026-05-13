@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Download, Receipt } from "lucide-react";
 
+import { AdminSaleManager } from "@/components/forms/admin-sale-manager";
 import { PosForm } from "@/components/forms/pos-form";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -14,6 +15,7 @@ export default async function BillingPage({
   searchParams?: {
     error?: string;
     sale?: string;
+    success?: string;
   };
 }) {
   const data = await getBillingData();
@@ -25,6 +27,12 @@ export default async function BillingPage({
       {searchParams?.error ? (
         <Card className="bg-rose-50">
           <div className="text-sm font-semibold text-rose-900">{decodeURIComponent(searchParams.error)}</div>
+        </Card>
+      ) : null}
+
+      {searchParams?.success ? (
+        <Card className="bg-brand-50">
+          <div className="text-sm font-semibold text-brand-900">{decodeURIComponent(searchParams.success)}</div>
         </Card>
       ) : null}
 
@@ -85,6 +93,17 @@ export default async function BillingPage({
           </TableBody>
         </Table>
       </Card>
+
+      {data.profile.role === "admin" ? (
+        <Card>
+          <CardHeader
+            title="Admin sale controls"
+            description="Edit past sales, update invoice data, and delete incorrect transactions. Invoice PDFs always reflect the latest saved values."
+            action={<Badge variant="warning">Admin only</Badge>}
+          />
+          <AdminSaleManager sales={data.editableSales} currency={currency} />
+        </Card>
+      ) : null}
     </div>
   );
 }

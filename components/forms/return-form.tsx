@@ -6,7 +6,7 @@ import { CornerUpLeft, Search } from "lucide-react";
 import { recordSaleReturnAction } from "@/lib/actions/pharmacy";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatPreciseQuantity } from "@/lib/utils";
 
 type SaleItemCandidate = {
   id: string;
@@ -134,11 +134,11 @@ export function ReturnForm({
                     <div>
                       <p className="font-semibold text-slate-950">{item.medicines?.name ?? "Medicine"}</p>
                       <p className="mt-2 text-sm text-slate-600">
-                        Batch {item.medicine_batches?.batch_number ?? "N/A"} • Sold qty {item.quantity}
+                        Batch {item.medicine_batches?.batch_number ?? "N/A"} • Sold qty {formatPreciseQuantity(item.quantity)}
                       </p>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <Input type="number" min={0} max={item.quantity} value={itemsState[item.id]?.quantity ?? 0} onChange={(event) => updateItem(item.id, { quantity: Number(event.target.value) || 0 })} />
+                      <Input type="number" min={0} max={item.quantity} step="0.01" value={itemsState[item.id]?.quantity ?? 0} onChange={(event) => updateItem(item.id, { quantity: Number(event.target.value) || 0 })} />
                       <Input
                         type="number"
                         min={0}

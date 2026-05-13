@@ -183,16 +183,29 @@ export async function getDashboardData() {
 }
 
 export async function getBillingData() {
-  const [settings, inventoryRows, recentSales] = await Promise.all([
+  const { profile } = await requireAuthenticated();
+  const supabase = createAdminClient();
+  const [settings, inventoryRows, recentSales, editableSalesRows] = await Promise.all([
     getStoreSettings(),
     getInventorySnapshot(),
-    getRecentSales(8)
+    getRecentSales(8),
+    profile.role === "admin"
+      ? supabase
+          .from("sales")
+          .select(
+            "id, invoice_number, sale_date, customer_name, subtotal, discount_amount, tax_amount, total_amount, payment_method, cash_amount, online_amount, online_payment_method, notes, sale_items(id, medicine_id, batch_id, quantity, unit_price, line_total, medicines(name), medicine_batches(batch_number))"
+          )
+          .order("sale_date", { ascending: false })
+          .limit(8)
+      : Promise.resolve({ data: [] })
   ]);
 
   return {
+    profile,
     settings,
     stockRows: inventoryRows.filter((item) => item.stock_quantity > 0),
-    recentSales
+    recentSales,
+    editableSales: (editableSalesRows.data as Array<Record<string, unknown>> | null) ?? []
   };
 }
 
@@ -249,9 +262,10 @@ export async function getRecentPurchases(limit = 10) {
 }
 
 export async function getReturnsData() {
-  await requireAuthenticated();
+  const { profile } = await requireAuthenticated();
   const supabase = createAdminClient();
-  const [recentReturns, saleCandidates] = await Promise.all([
+  const [settings, recentReturns, saleCandidates, editableReturns] = await Promise.all([
+    getStoreSettings(),
     supabase
       .from("sales_returns")
       .select("id, refund_amount, reason, return_date, sale_id, sales(invoice_number, customer_name)")
@@ -261,12 +275,24 @@ export async function getReturnsData() {
       .from("sales")
       .select("id, invoice_number, customer_name, total_amount, sale_date, sale_items(id, quantity, unit_price, line_total, batch_id, medicine_id, medicines(name), medicine_batches(batch_number))")
       .order("sale_date", { ascending: false })
-      .limit(12)
+      .limit(12),
+    profile.role === "admin"
+      ? supabase
+          .from("sales_returns")
+          .select(
+            "id, refund_amount, reason, return_date, sale_id, sales(invoice_number, customer_name), sale_return_items(id, sale_item_id, batch_id, quantity, refund_amount, sale_items(quantity, unit_price, medicines(name), medicine_batches(batch_number)))"
+          )
+          .order("return_date", { ascending: false })
+          .limit(10)
+      : Promise.resolve({ data: [] })
   ]);
 
   return {
+    profile,
+    settings,
     recentReturns: (recentReturns.data as Array<Record<string, unknown>> | null) ?? [],
-    saleCandidates: (saleCandidates.data as Array<Record<string, unknown>> | null) ?? []
+    saleCandidates: (saleCandidates.data as Array<Record<string, unknown>> | null) ?? [],
+    editableReturns: (editableReturns.data as Array<Record<string, unknown>> | null) ?? []
   };
 }
 

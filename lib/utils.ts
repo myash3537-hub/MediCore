@@ -26,6 +26,13 @@ export function formatQuantity(value: number) {
   }).format(Number(value ?? 0));
 }
 
+export function formatPreciseQuantity(value: number) {
+  return new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(Number(value ?? 0));
+}
+
 type PaymentDisplay = {
   payment_method: PaymentMethod;
   cash_amount?: number | null;

@@ -38,6 +38,84 @@ function redirectWithMessage(path: string, key: "error" | "info" | "success", me
   redirect(`${path}?${key}=${encodeURIComponent(message)}`);
 }
 
+type EditableSaleItemPayload = {
+  id: string;
+  medicine_id: string;
+  batch_id: string;
+  quantity: number;
+  unit_price: number;
+};
+
+type EditableReturnItemPayload = {
+  id: string;
+  sale_item_id: string;
+  batch_id: string;
+  quantity: number;
+  refund_amount: number;
+};
+
+function toQuantity(value: number) {
+  return Number(value.toFixed(2));
+}
+
+function revalidateOperationsPages() {
+  revalidatePath("/billing");
+  revalidatePath("/inventory");
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  revalidatePath("/returns");
+}
+
+function resolvePaymentBreakdown({
+  paymentMethod,
+  totalAmount,
+  cashAmount,
+  onlineAmount,
+  onlinePaymentMethod
+}: {
+  paymentMethod: PaymentMethod;
+  totalAmount: number;
+  cashAmount: number;
+  onlineAmount: number;
+  onlinePaymentMethod: string | null;
+}) {
+  if (paymentMethod === "Cash") {
+    return {
+      cashAmount: totalAmount,
+      onlineAmount: 0,
+      onlinePaymentMethod: null
+    };
+  }
+
+  if (paymentMethod === "UPI" || paymentMethod === "Card") {
+    return {
+      cashAmount: 0,
+      onlineAmount: totalAmount,
+      onlinePaymentMethod: paymentMethod
+    };
+  }
+
+  const splitDifference = Math.abs(toMoney(totalAmount - (cashAmount + onlineAmount)));
+
+  if (!onlinePaymentMethod || !["UPI", "Card"].includes(onlinePaymentMethod)) {
+    throw new Error("Choose whether the online portion is paid by UPI or Card.");
+  }
+
+  if (totalAmount > 0 && (cashAmount <= 0 || onlineAmount <= 0)) {
+    throw new Error("Split payments must include both a cash amount and an online amount.");
+  }
+
+  if (splitDifference > 0.01) {
+    throw new Error("Cash and online amounts must match the final bill total.");
+  }
+
+  return {
+    cashAmount,
+    onlineAmount,
+    onlinePaymentMethod
+  };
+}
+
 async function resolveSupplierId({
   supplierId,
   supplierName
@@ -305,28 +383,19 @@ export async function recordSaleAction(formData: FormData) {
     redirectWithMessage("/billing", "error", "Add at least one medicine to the bill before completing the sale.");
   }
 
-  if (paymentMethod === "Cash") {
-    cashAmount = totalAmount;
-    onlineAmount = 0;
-    onlinePaymentMethod = null;
-  } else if (paymentMethod === "UPI" || paymentMethod === "Card") {
-    cashAmount = 0;
-    onlineAmount = totalAmount;
-    onlinePaymentMethod = paymentMethod;
-  } else if (paymentMethod === "Split") {
-    const splitDifference = Math.abs(toMoney(totalAmount - (cashAmount + onlineAmount)));
-
-    if (!onlinePaymentMethod || !["UPI", "Card"].includes(onlinePaymentMethod)) {
-      redirectWithMessage("/billing", "error", "Choose whether the online portion is paid by UPI or Card.");
-    }
-
-    if (totalAmount > 0 && (cashAmount <= 0 || onlineAmount <= 0)) {
-      redirectWithMessage("/billing", "error", "Split payments must include both a cash amount and an online amount.");
-    }
-
-    if (splitDifference > 0.01) {
-      redirectWithMessage("/billing", "error", "Cash and online amounts must match the final bill total.");
-    }
+  try {
+    const paymentBreakdown = resolvePaymentBreakdown({
+      paymentMethod,
+      totalAmount,
+      cashAmount,
+      onlineAmount,
+      onlinePaymentMethod
+    });
+    cashAmount = paymentBreakdown.cashAmount;
+    onlineAmount = paymentBreakdown.onlineAmount;
+    onlinePaymentMethod = paymentBreakdown.onlinePaymentMethod;
+  } catch (error) {
+    redirectWithMessage("/billing", "error", error instanceof Error ? error.message : "Payment could not be validated.");
   }
 
   const { data, error } = await supabase.rpc("record_sale", {
@@ -345,11 +414,7 @@ export async function recordSaleAction(formData: FormData) {
     redirectWithMessage("/billing", "error", error?.message ?? "Sale could not be completed.");
   }
 
-  revalidatePath("/billing");
-  revalidatePath("/inventory");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
-  revalidatePath("/returns");
+  revalidateOperationsPages();
   redirect(`/billing?sale=${String(data ?? "")}`);
 }
 
@@ -384,6 +449,453 @@ export async function recordSaleReturnAction(formData: FormData) {
   revalidatePath("/reports");
   revalidatePath("/billing");
   redirect(`/returns?return=${String(data ?? "")}`);
+}
+
+export async function updateSaleAction(formData: FormData) {
+  const { profile } = await requireRole("admin");
+  const supabase = createAdminClient();
+  const saleId = asString(formData.get("sale_id"));
+  const paymentMethod = asString(formData.get("payment_method")) as PaymentMethod;
+  const discountAmount = toMoney(asNumber(formData.get("discount_amount")));
+  const taxAmount = toMoney(asNumber(formData.get("tax_amount")));
+  let cashAmount = toMoney(asNumber(formData.get("cash_amount")));
+  let onlineAmount = toMoney(asNumber(formData.get("online_amount")));
+  let onlinePaymentMethod = asString(formData.get("online_payment_method")) || null;
+  const items = parseJsonField<EditableSaleItemPayload[]>(formData.get("items_json"), []).map((item) => ({
+    ...item,
+    quantity: toQuantity(asNumber(String(item.quantity))),
+    unit_price: toMoney(asNumber(String(item.unit_price)))
+  }));
+
+  if (!saleId) {
+    redirectWithMessage("/billing", "error", "Select a sale before updating it.");
+  }
+
+  if (!items.length) {
+    redirectWithMessage("/billing", "error", "A sale must keep at least one billed medicine.");
+  }
+
+  const [{ data: existingSale }, { data: existingItems }, { data: returnedItems }] = await Promise.all([
+    supabase.from("sales").select("id, invoice_number").eq("id", saleId).maybeSingle(),
+    supabase.from("sale_items").select("id, medicine_id, batch_id, quantity, unit_price").eq("sale_id", saleId),
+    supabase.from("sale_return_items").select("sale_item_id, quantity").in("sale_item_id", items.map((item) => item.id))
+  ]);
+
+  if (!existingSale) {
+    redirectWithMessage("/billing", "error", "Sale not found.");
+  }
+
+  const currentItems = ((existingItems as Array<Record<string, unknown>> | null) ?? []).map((item) => ({
+    id: String(item.id),
+    medicine_id: String(item.medicine_id),
+    batch_id: String(item.batch_id),
+    quantity: toQuantity(Number(item.quantity ?? 0)),
+    unit_price: toMoney(Number(item.unit_price ?? 0))
+  }));
+  const currentItemsById = new Map(currentItems.map((item) => [item.id, item]));
+  const returnedBySaleItemId = new Map<string, number>();
+
+  (((returnedItems as Array<Record<string, unknown>> | null) ?? [])).forEach((item) => {
+    const saleItemId = String(item.sale_item_id ?? "");
+    returnedBySaleItemId.set(saleItemId, toQuantity((returnedBySaleItemId.get(saleItemId) ?? 0) + Number(item.quantity ?? 0)));
+  });
+
+  const additionalDemandByBatch = new Map<string, number>();
+
+  for (const item of items) {
+    const currentItem = currentItemsById.get(item.id);
+
+    if (!currentItem) {
+      redirectWithMessage("/billing", "error", "One of the sale lines could not be matched. Reload the page and try again.");
+    }
+
+    if (item.quantity <= 0) {
+      redirectWithMessage("/billing", "error", "Sale item quantity must stay above zero.");
+    }
+
+    if (item.unit_price < 0) {
+      redirectWithMessage("/billing", "error", "Unit price cannot be negative.");
+    }
+
+    if ((returnedBySaleItemId.get(item.id) ?? 0) > item.quantity) {
+      redirectWithMessage("/billing", "error", "You cannot reduce a sale item below the quantity that has already been returned.");
+    }
+
+    const delta = toQuantity(item.quantity - currentItem.quantity);
+
+    if (delta > 0) {
+      additionalDemandByBatch.set(item.batch_id, toQuantity((additionalDemandByBatch.get(item.batch_id) ?? 0) + delta));
+    }
+  }
+
+  const batchIds = Array.from(new Set(items.map((item) => item.batch_id)));
+  const { data: batchRows } = await supabase.from("medicine_batches").select("id, stock_quantity").in("id", batchIds);
+  const batchStockById = new Map(
+    (((batchRows as Array<Record<string, unknown>> | null) ?? [])).map((row) => [String(row.id), toQuantity(Number(row.stock_quantity ?? 0))])
+  );
+
+  for (const [batchId, requiredQuantity] of additionalDemandByBatch.entries()) {
+    if ((batchStockById.get(batchId) ?? 0) < requiredQuantity) {
+      redirectWithMessage("/billing", "error", "Not enough stock remains to increase one of the billed quantities.");
+    }
+  }
+
+  for (const item of items) {
+    const currentItem = currentItemsById.get(item.id)!;
+    const delta = toQuantity(item.quantity - currentItem.quantity);
+
+    if (delta !== 0) {
+      const nextStock = toQuantity((batchStockById.get(item.batch_id) ?? 0) - delta);
+
+      if (nextStock < 0) {
+        redirectWithMessage("/billing", "error", "Stock would go negative after this sale update.");
+      }
+
+      await supabase.from("medicine_batches").update({ stock_quantity: nextStock }).eq("id", item.batch_id);
+      batchStockById.set(item.batch_id, nextStock);
+
+      await supabase.from("stock_movements").insert({
+        medicine_id: item.medicine_id,
+        batch_id: item.batch_id,
+        movement_type: "adjustment",
+        quantity: toQuantity(-1 * delta),
+        reference_id: saleId,
+        notes: `Admin edited sale ${String((existingSale as { invoice_number?: string }).invoice_number ?? "")}`,
+        created_by: profile.id
+      });
+    }
+
+    await supabase
+      .from("sale_items")
+      .update({
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        line_total: toMoney(item.quantity * item.unit_price)
+      })
+      .eq("id", item.id);
+  }
+
+  const subtotal = toMoney(items.reduce((total, item) => total + item.quantity * item.unit_price, 0));
+  const totalAmount = toMoney(Math.max(subtotal - discountAmount + taxAmount, 0));
+
+  try {
+    const paymentBreakdown = resolvePaymentBreakdown({
+      paymentMethod,
+      totalAmount,
+      cashAmount,
+      onlineAmount,
+      onlinePaymentMethod
+    });
+    cashAmount = paymentBreakdown.cashAmount;
+    onlineAmount = paymentBreakdown.onlineAmount;
+    onlinePaymentMethod = paymentBreakdown.onlinePaymentMethod;
+  } catch (error) {
+    redirectWithMessage("/billing", "error", error instanceof Error ? error.message : "Payment could not be validated.");
+  }
+
+  await supabase
+    .from("sales")
+    .update({
+      customer_name: asString(formData.get("customer_name")) || null,
+      payment_method: paymentMethod,
+      discount_amount: discountAmount,
+      tax_amount: taxAmount,
+      subtotal,
+      total_amount: totalAmount,
+      cash_amount: cashAmount,
+      online_amount: onlineAmount,
+      online_payment_method: onlinePaymentMethod,
+      notes: asString(formData.get("notes")) || null
+    })
+    .eq("id", saleId);
+
+  await recordAuditForUser(profile.id, "sales", saleId, "updated", {
+    invoice_number: (existingSale as { invoice_number?: string }).invoice_number ?? null
+  });
+
+  revalidateOperationsPages();
+  redirectWithMessage("/billing", "success", "Sale updated successfully. The invoice PDF now reflects the edited values.");
+}
+
+export async function deleteSaleAction(formData: FormData) {
+  const { profile } = await requireRole("admin");
+  const supabase = createAdminClient();
+  const saleId = asString(formData.get("sale_id"));
+
+  if (!saleId) {
+    redirectWithMessage("/billing", "error", "Select a sale before deleting it.");
+  }
+
+  const [{ data: sale }, { data: saleItems }, { count: returnsCount }] = await Promise.all([
+    supabase.from("sales").select("id, invoice_number").eq("id", saleId).maybeSingle(),
+    supabase.from("sale_items").select("id, medicine_id, batch_id, quantity").eq("sale_id", saleId),
+    supabase.from("sales_returns").select("id", { count: "exact", head: true }).eq("sale_id", saleId)
+  ]);
+
+  if (!sale) {
+    redirectWithMessage("/billing", "error", "Sale not found.");
+  }
+
+  if ((returnsCount ?? 0) > 0) {
+    redirectWithMessage("/billing", "error", "Delete the linked return entries first, then delete this sale.");
+  }
+
+  for (const item of ((saleItems as Array<Record<string, unknown>> | null) ?? [])) {
+    const batchId = String(item.batch_id ?? "");
+    const quantity = toQuantity(Number(item.quantity ?? 0));
+    const medicineId = String(item.medicine_id ?? "");
+
+    const { data: batchRow } = await supabase.from("medicine_batches").select("stock_quantity").eq("id", batchId).maybeSingle();
+    const nextStock = toQuantity(Number((batchRow as { stock_quantity?: number } | null)?.stock_quantity ?? 0) + quantity);
+
+    await supabase.from("medicine_batches").update({ stock_quantity: nextStock }).eq("id", batchId);
+    await supabase.from("stock_movements").insert({
+      medicine_id: medicineId,
+      batch_id: batchId,
+      movement_type: "adjustment",
+      quantity,
+      reference_id: saleId,
+      notes: `Admin deleted sale ${String((sale as { invoice_number?: string }).invoice_number ?? "")}`,
+      created_by: profile.id
+    });
+  }
+
+  await supabase.from("stock_movements").delete().eq("reference_id", saleId).eq("movement_type", "sale");
+  await supabase.from("sales").delete().eq("id", saleId);
+  await recordAuditForUser(profile.id, "sales", saleId, "deleted", {
+    invoice_number: (sale as { invoice_number?: string }).invoice_number ?? null
+  });
+
+  revalidateOperationsPages();
+  redirectWithMessage("/billing", "success", "Sale deleted and stock restored successfully.");
+}
+
+export async function updateSaleReturnAction(formData: FormData) {
+  const { profile } = await requireRole("admin");
+  const supabase = createAdminClient();
+  const saleReturnId = asString(formData.get("sale_return_id"));
+  const items = parseJsonField<EditableReturnItemPayload[]>(formData.get("items_json"), []).map((item) => ({
+    ...item,
+    quantity: toQuantity(asNumber(String(item.quantity))),
+    refund_amount: toMoney(asNumber(String(item.refund_amount)))
+  }));
+
+  if (!saleReturnId) {
+    redirectWithMessage("/returns", "error", "Select a return before updating it.");
+  }
+
+  if (!items.some((item) => item.quantity > 0)) {
+    redirectWithMessage("/returns", "error", "A return must keep at least one returned line. Use delete if you want to remove it completely.");
+  }
+
+  const [{ data: saleReturn }, { data: existingReturnItems }] = await Promise.all([
+    supabase.from("sales_returns").select("id, sale_id").eq("id", saleReturnId).maybeSingle(),
+    supabase.from("sale_return_items").select("id, sale_item_id, batch_id, quantity, refund_amount").eq("sale_return_id", saleReturnId)
+  ]);
+
+  if (!saleReturn) {
+    redirectWithMessage("/returns", "error", "Return not found.");
+  }
+
+  const currentReturnItems = (((existingReturnItems as Array<Record<string, unknown>> | null) ?? [])).map((item) => ({
+    id: String(item.id),
+    sale_item_id: String(item.sale_item_id),
+    batch_id: String(item.batch_id),
+    quantity: toQuantity(Number(item.quantity ?? 0)),
+    refund_amount: toMoney(Number(item.refund_amount ?? 0))
+  }));
+  const currentReturnItemsById = new Map(currentReturnItems.map((item) => [item.id, item]));
+  const saleItemIds = Array.from(new Set(currentReturnItems.map((item) => item.sale_item_id)));
+
+  const [{ data: saleItems }, { data: allReturnItems }, { data: batchRows }] = await Promise.all([
+    supabase.from("sale_items").select("id, medicine_id, batch_id, quantity").in("id", saleItemIds),
+    supabase.from("sale_return_items").select("id, sale_return_id, sale_item_id, quantity").in("sale_item_id", saleItemIds),
+    supabase.from("medicine_batches").select("id, stock_quantity").in("id", currentReturnItems.map((item) => item.batch_id))
+  ]);
+
+  const soldItemsById = new Map(
+    (((saleItems as Array<Record<string, unknown>> | null) ?? [])).map((item) => [
+      String(item.id),
+      {
+        medicine_id: String(item.medicine_id),
+        batch_id: String(item.batch_id),
+        quantity: toQuantity(Number(item.quantity ?? 0))
+      }
+    ])
+  );
+
+  const otherReturnedBySaleItemId = new Map<string, number>();
+  (((allReturnItems as Array<Record<string, unknown>> | null) ?? [])).forEach((item) => {
+    if (String(item.sale_return_id ?? "") === saleReturnId) {
+      return;
+    }
+
+    const saleItemId = String(item.sale_item_id ?? "");
+    otherReturnedBySaleItemId.set(saleItemId, toQuantity((otherReturnedBySaleItemId.get(saleItemId) ?? 0) + Number(item.quantity ?? 0)));
+  });
+
+  const batchStockById = new Map(
+    (((batchRows as Array<Record<string, unknown>> | null) ?? [])).map((row) => [String(row.id), toQuantity(Number(row.stock_quantity ?? 0))])
+  );
+
+  for (const item of items) {
+    const currentItem = currentReturnItemsById.get(item.id);
+
+    if (!currentItem) {
+      redirectWithMessage("/returns", "error", "One of the return lines could not be matched. Reload the page and try again.");
+    }
+
+    if (item.quantity < 0) {
+      redirectWithMessage("/returns", "error", "Return quantity cannot be negative.");
+    }
+
+    const soldItem = soldItemsById.get(item.sale_item_id);
+    if (!soldItem) {
+      redirectWithMessage("/returns", "error", "The linked original sale line could not be found.");
+    }
+
+    if (toQuantity((otherReturnedBySaleItemId.get(item.sale_item_id) ?? 0) + item.quantity) > soldItem.quantity) {
+      redirectWithMessage("/returns", "error", "Return quantity cannot exceed what was originally sold.");
+    }
+
+    const stockReduction = toQuantity(currentItem.quantity - item.quantity);
+    if (stockReduction > 0 && (batchStockById.get(item.batch_id) ?? 0) < stockReduction) {
+      redirectWithMessage("/returns", "error", "Stock is no longer high enough to reduce one of the previously returned quantities.");
+    }
+  }
+
+  for (const item of items) {
+    const currentItem = currentReturnItemsById.get(item.id)!;
+    const soldItem = soldItemsById.get(item.sale_item_id)!;
+    const delta = toQuantity(item.quantity - currentItem.quantity);
+
+    if (delta !== 0) {
+      const nextStock = toQuantity((batchStockById.get(item.batch_id) ?? 0) + delta);
+      await supabase.from("medicine_batches").update({ stock_quantity: nextStock }).eq("id", item.batch_id);
+      batchStockById.set(item.batch_id, nextStock);
+
+      await supabase.from("stock_movements").insert({
+        medicine_id: soldItem.medicine_id,
+        batch_id: item.batch_id,
+        movement_type: "adjustment",
+        quantity: delta,
+        reference_id: saleReturnId,
+        notes: "Admin edited sale return",
+        created_by: profile.id
+      });
+    }
+
+    if (item.quantity > 0) {
+      await supabase
+        .from("sale_return_items")
+        .update({
+          quantity: item.quantity,
+          refund_amount: item.refund_amount
+        })
+        .eq("id", item.id);
+    } else {
+      await supabase.from("sale_return_items").delete().eq("id", item.id);
+    }
+  }
+
+  const remainingItems = items.filter((item) => item.quantity > 0);
+  const refundAmount = toMoney(remainingItems.reduce((total, item) => total + item.refund_amount, 0));
+
+  await supabase
+    .from("sales_returns")
+    .update({
+      reason: asString(formData.get("reason")) || null,
+      refund_amount: refundAmount
+    })
+    .eq("id", saleReturnId);
+
+  await recordAuditForUser(profile.id, "sales_returns", saleReturnId, "updated", {
+    sale_id: (saleReturn as { sale_id?: string }).sale_id ?? null
+  });
+
+  revalidateOperationsPages();
+  redirectWithMessage("/returns", "success", "Return updated successfully.");
+}
+
+export async function deleteSaleReturnAction(formData: FormData) {
+  const { profile } = await requireRole("admin");
+  const supabase = createAdminClient();
+  const saleReturnId = asString(formData.get("sale_return_id"));
+
+  if (!saleReturnId) {
+    redirectWithMessage("/returns", "error", "Select a return before deleting it.");
+  }
+
+  const [{ data: saleReturn }, { data: returnItems }] = await Promise.all([
+    supabase.from("sales_returns").select("id, sale_id").eq("id", saleReturnId).maybeSingle(),
+    supabase.from("sale_return_items").select("id, sale_item_id, batch_id, quantity").eq("sale_return_id", saleReturnId)
+  ]);
+
+  if (!saleReturn) {
+    redirectWithMessage("/returns", "error", "Return not found.");
+  }
+
+  const saleItemIds = (((returnItems as Array<Record<string, unknown>> | null) ?? [])).map((item) => String(item.sale_item_id ?? ""));
+  const [{ data: saleItems }, { data: batchRows }] = await Promise.all([
+    supabase.from("sale_items").select("id, medicine_id, batch_id").in("id", saleItemIds),
+    supabase
+      .from("medicine_batches")
+      .select("id, stock_quantity")
+      .in("id", (((returnItems as Array<Record<string, unknown>> | null) ?? [])).map((item) => String(item.batch_id ?? "")))
+  ]);
+
+  const saleItemById = new Map(
+    (((saleItems as Array<Record<string, unknown>> | null) ?? [])).map((item) => [
+      String(item.id),
+      {
+        medicine_id: String(item.medicine_id),
+        batch_id: String(item.batch_id)
+      }
+    ])
+  );
+  const batchStockById = new Map(
+    (((batchRows as Array<Record<string, unknown>> | null) ?? [])).map((row) => [String(row.id), toQuantity(Number(row.stock_quantity ?? 0))])
+  );
+
+  for (const item of ((returnItems as Array<Record<string, unknown>> | null) ?? [])) {
+    const batchId = String(item.batch_id ?? "");
+    const quantity = toQuantity(Number(item.quantity ?? 0));
+
+    if ((batchStockById.get(batchId) ?? 0) < quantity) {
+      redirectWithMessage("/returns", "error", "Stock is too low to delete this return safely because some of the restored quantity has already been used.");
+    }
+  }
+
+  for (const item of ((returnItems as Array<Record<string, unknown>> | null) ?? [])) {
+    const batchId = String(item.batch_id ?? "");
+    const quantity = toQuantity(Number(item.quantity ?? 0));
+    const saleItem = saleItemById.get(String(item.sale_item_id ?? ""));
+    const nextStock = toQuantity((batchStockById.get(batchId) ?? 0) - quantity);
+    batchStockById.set(batchId, nextStock);
+
+    await supabase.from("medicine_batches").update({ stock_quantity: nextStock }).eq("id", batchId);
+
+    if (saleItem) {
+      await supabase.from("stock_movements").insert({
+        medicine_id: saleItem.medicine_id,
+        batch_id: batchId,
+        movement_type: "adjustment",
+        quantity: -1 * quantity,
+        reference_id: saleReturnId,
+        notes: "Admin deleted sale return",
+        created_by: profile.id
+      });
+    }
+  }
+
+  await supabase.from("stock_movements").delete().eq("reference_id", saleReturnId).eq("movement_type", "return");
+  await supabase.from("sales_returns").delete().eq("id", saleReturnId);
+  await recordAuditForUser(profile.id, "sales_returns", saleReturnId, "deleted", {
+    sale_id: (saleReturn as { sale_id?: string }).sale_id ?? null
+  });
+
+  revalidateOperationsPages();
+  redirectWithMessage("/returns", "success", "Return deleted successfully.");
 }
 
 export async function upsertUserAction(formData: FormData) {

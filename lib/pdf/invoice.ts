@@ -85,7 +85,7 @@ export async function buildInvoicePdf(payload: InvoicePayload) {
   payload.items.forEach((item) => {
     drawText(item.medicine_name, 46, cursorY, 10, true);
     drawText(item.batch_number, 256, cursorY, 10);
-    drawText(String(item.quantity), 346, cursorY, 10);
+    drawText(item.quantity.toFixed(2), 346, cursorY, 10);
     drawText(item.unit_price.toFixed(2), 406, cursorY, 10);
     drawText(item.line_total.toFixed(2), 486, cursorY, 10, true);
     cursorY -= 22;
