@@ -18,8 +18,9 @@ export function StatCard({
     trend === "up" ? <ArrowUpRight className="h-4 w-4" /> : trend === "down" ? <ArrowDownRight className="h-4 w-4" /> : null;
 
   return (
-    <Card className="overflow-hidden p-0">
-      <div className="flex h-full flex-col gap-6 p-6">
+    <Card className="group overflow-hidden p-0">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(32,166,99,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(38,158,162,0.12),transparent_24%)] opacity-90" />
+      <div className="relative flex h-full flex-col gap-6 p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{title}</p>
@@ -35,4 +36,3 @@ export function StatCard({
     </Card>
   );
 }
-

@@ -96,54 +96,58 @@ export default async function ReportsPage() {
           </Table>
         </Card>
 
-        <Card>
+        <Card className="overflow-hidden">
           <CardHeader title="Expiry report" description="Batches needing disposal planning, discounting, or supplier escalation." action={<Badge variant="warning">{data.expiringItems.length} flagged</Badge>} />
-          <Table>
-            <TableHead>
-              <tr>
-                <TableHeaderCell>Medicine</TableHeaderCell>
-                <TableHeaderCell>Expiry</TableHeaderCell>
-                <TableHeaderCell>Stock</TableHeaderCell>
-                <TableHeaderCell>Category</TableHeaderCell>
-              </tr>
-            </TableHead>
-            <TableBody>
-              {data.expiringItems.slice(0, 10).map((row) => (
-                <TableRow key={row.batch_id}>
-                  <TableCell>{row.medicine_name}</TableCell>
-                  <TableCell>{row.expiry_date}</TableCell>
-                  <TableCell>{formatQuantity(row.stock_quantity)}</TableCell>
-                  <TableCell>{row.category}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="scrollbar-thin max-h-[28rem] overflow-y-auto pr-2">
+            <Table>
+              <TableHead>
+                <tr>
+                  <TableHeaderCell>Medicine</TableHeaderCell>
+                  <TableHeaderCell>Expiry</TableHeaderCell>
+                  <TableHeaderCell>Stock</TableHeaderCell>
+                  <TableHeaderCell>Category</TableHeaderCell>
+                </tr>
+              </TableHead>
+              <TableBody>
+                {data.expiringItems.map((row) => (
+                  <TableRow key={row.batch_id}>
+                    <TableCell>{row.medicine_name}</TableCell>
+                    <TableCell>{row.expiry_date}</TableCell>
+                    <TableCell>{formatQuantity(row.stock_quantity)}</TableCell>
+                    <TableCell>{row.category}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <Card>
+        <Card className="overflow-hidden">
           <CardHeader title="Sales report" description="Latest billing transactions available for operational or accounting review." />
-          <Table>
-            <TableHead>
-              <tr>
-                <TableHeaderCell>Invoice</TableHeaderCell>
-                <TableHeaderCell>Date</TableHeaderCell>
-                <TableHeaderCell>Payment</TableHeaderCell>
-                <TableHeaderCell>Total</TableHeaderCell>
-              </tr>
-            </TableHead>
-            <TableBody>
-              {data.recentSales.slice(0, 10).map((sale) => (
-                <TableRow key={sale.id}>
-                  <TableCell>{sale.invoice_number}</TableCell>
-                  <TableCell>{sale.sale_date.slice(0, 10)}</TableCell>
-                  <TableCell>{formatPaymentLabel(sale, currency)}</TableCell>
-                  <TableCell>{formatCurrency(sale.total_amount, currency)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="scrollbar-thin max-h-[28rem] overflow-y-auto pr-2">
+            <Table>
+              <TableHead>
+                <tr>
+                  <TableHeaderCell>Invoice</TableHeaderCell>
+                  <TableHeaderCell>Date</TableHeaderCell>
+                  <TableHeaderCell>Payment</TableHeaderCell>
+                  <TableHeaderCell>Total</TableHeaderCell>
+                </tr>
+              </TableHead>
+              <TableBody>
+                {data.recentSales.map((sale) => (
+                  <TableRow key={sale.id}>
+                    <TableCell>{sale.invoice_number}</TableCell>
+                    <TableCell>{sale.sale_date.slice(0, 10)}</TableCell>
+                    <TableCell>{formatPaymentLabel(sale, currency)}</TableCell>
+                    <TableCell>{formatCurrency(sale.total_amount, currency)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
 
         {isAdmin ? (

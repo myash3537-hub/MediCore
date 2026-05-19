@@ -37,7 +37,7 @@ export function TableRow({
   children: React.ReactNode;
   className?: string;
 }>) {
-  return <tr className={cn("rounded-3xl bg-slate-50 text-sm text-slate-700", className)}>{children}</tr>;
+  return <tr className={cn("rounded-3xl border border-white/70 bg-white/[0.74] text-sm text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.05)]", className)}>{children}</tr>;
 }
 
 export function TableHeaderCell({

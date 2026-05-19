@@ -1,10 +1,12 @@
-import { AlertTriangle, Archive, Boxes, CircleAlert, CircleCheckBig, Info, PencilLine } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, Archive, Boxes, CircleAlert, CircleCheckBig, Info, PencilLine, Search, Sparkles } from "lucide-react";
 
 import { archiveMedicineAction } from "@/lib/actions/pharmacy";
 import { MedicineForm } from "@/components/forms/medicine-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
 import { requireAuthenticated } from "@/lib/auth";
 import { getInventorySnapshot, getStoreSettings, getSuppliers } from "@/lib/data/pharmacy";
@@ -62,6 +64,28 @@ function groupInventoryRows(rows: InventorySnapshotRow[]) {
   return Array.from(groups.values());
 }
 
+function filterInventoryGroups(groups: InventoryGroup[], query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+
+  if (!normalizedQuery) {
+    return groups;
+  }
+
+  return groups.filter((group) => {
+    const medicineMatch =
+      group.medicine_name.toLowerCase().includes(normalizedQuery) || group.category.toLowerCase().includes(normalizedQuery);
+
+    if (medicineMatch) {
+      return true;
+    }
+
+    return group.batches.some((batch) => {
+      const supplierName = batch.supplier_name?.toLowerCase() ?? "";
+      return batch.batch_number.toLowerCase().includes(normalizedQuery) || supplierName.includes(normalizedQuery);
+    });
+  });
+}
+
 export default async function InventoryPage({
   searchParams
 }: {
@@ -69,6 +93,7 @@ export default async function InventoryPage({
     error?: string;
     info?: string;
     success?: string;
+    query?: string;
   };
 }) {
   const { profile } = await requireAuthenticated();
@@ -76,6 +101,8 @@ export default async function InventoryPage({
   const currency = settings?.currency_code ?? "INR";
   const canManagePurchasePrice = profile.role === "admin";
   const inventoryGroups = groupInventoryRows(inventoryRows);
+  const searchQuery = searchParams?.query?.trim() ?? "";
+  const filteredInventoryGroups = filterInventoryGroups(inventoryGroups, searchQuery);
 
   return (
     <div className="space-y-6">
@@ -121,9 +148,42 @@ export default async function InventoryPage({
 
       <Card>
         <CardHeader
+          title="Search inventory fast"
+          description="Jump straight to a medicine, batch number, category, or supplier without scanning the full stock board."
+          action={<Badge variant="success">{filteredInventoryGroups.length} visible medicines</Badge>}
+        />
+        <form className="grid gap-4 lg:grid-cols-[1fr_auto_auto]" method="get">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              name="query"
+              defaultValue={searchQuery}
+              placeholder="Search medicine name, batch, category, supplier..."
+              className="h-12 rounded-[22px] border-white/80 bg-white/[0.84] pl-11 shadow-[0_16px_32px_rgba(15,23,42,0.06)]"
+            />
+          </div>
+          <Button type="submit" variant="success" className="h-12 rounded-[22px] px-6">
+            <Sparkles className="h-4 w-4" />
+            Search now
+          </Button>
+          <Link
+            href="/inventory"
+            className="inline-flex h-12 items-center justify-center rounded-[22px] border border-slate-200 bg-white/[0.82] px-6 text-sm font-semibold text-slate-700 shadow-[0_14px_30px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:bg-white"
+          >
+            Clear
+          </Link>
+        </form>
+      </Card>
+
+      <Card>
+        <CardHeader
           title="Inventory overview"
-          description="Medicines are grouped once, with every active batch shown inside the same row for cleaner stock review."
-          action={<Badge variant="success">{inventoryGroups.length} medicines / {inventoryRows.length} active batches</Badge>}
+          description={
+            searchQuery
+              ? `Showing matches for "${searchQuery}". Medicines stay grouped once, with all active batches nested inside the same row.`
+              : "Medicines are grouped once, with every active batch shown inside the same row for cleaner stock review."
+          }
+          action={<Badge variant="success">{filteredInventoryGroups.length} medicines / {inventoryRows.length} active batches</Badge>}
         />
         <Table>
           <TableHead>
@@ -137,7 +197,7 @@ export default async function InventoryPage({
             </tr>
           </TableHead>
           <TableBody>
-            {inventoryGroups.map((group) => (
+            {filteredInventoryGroups.map((group) => (
               <TableRow key={group.medicine_id}>
                 <TableCell>
                   <p className="font-semibold text-slate-950">{group.medicine_name}</p>
@@ -223,6 +283,14 @@ export default async function InventoryPage({
                 </TableCell>
               </TableRow>
             ))}
+            {!filteredInventoryGroups.length ? (
+              <TableRow>
+                <TableCell colSpan={6} className="py-8 text-center">
+                  <p className="font-semibold text-slate-900">No medicines matched that search.</p>
+                  <p className="mt-2 text-sm text-slate-500">Try a medicine name, supplier, category, or batch number.</p>
+                </TableCell>
+              </TableRow>
+            ) : null}
           </TableBody>
         </Table>
       </Card>
