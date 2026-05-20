@@ -15,7 +15,7 @@ const ibmPlexSans = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "MediCore",
+  title: "THE SR'S PHARMACY",
   description: "Cloud-native pharmacy management platform for retail medical stores."
 };
 

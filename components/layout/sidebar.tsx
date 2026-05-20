@@ -31,10 +31,10 @@ export function Sidebar({ profile }: Readonly<{ profile: Profile }>) {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(32,166,99,0.28),transparent_30%),radial-gradient(circle_at_90%_10%,rgba(38,158,162,0.22),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.05),transparent_28%)]" />
         <div className="relative flex items-center gap-4 rounded-3xl border border-white/10 bg-white/[0.07] p-4 backdrop-blur">
           <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-gradient-to-br from-brand-400 to-accent-500 text-lg font-bold text-white shadow-[0_16px_32px_rgba(32,166,99,0.22)]">
-            PK
+            SR
           </div>
           <div>
-            <p className="font-display text-xl font-semibold">MediCore</p>
+            <p className="font-display text-lg font-semibold leading-tight">THE SR&apos;S PHARMACY</p>
             <p className="text-sm text-slate-300">Cloud pharmacy suite</p>
           </div>
         </div>

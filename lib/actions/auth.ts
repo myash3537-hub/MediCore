@@ -11,7 +11,7 @@ function normalizeAuthError(error: unknown) {
   }
 
   if (error.message.includes("<!DOCTYPE") || error.message.includes("is not valid JSON")) {
-    return "Authentication service returned an invalid response. Please restart MediCore and try again.";
+    return "Authentication service returned an invalid response. Please restart THE SR'S PHARMACY and try again.";
   }
 
   return error.message || "Unable to sign in right now. Please try again.";

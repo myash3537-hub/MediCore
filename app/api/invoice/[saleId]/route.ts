@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { buildInvoicePdf } from "@/lib/pdf/invoice";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { formatPaymentLabel } from "@/lib/utils";
+import { BRAND_NAME, formatPaymentLabel, normalizeStoreName } from "@/lib/utils";
 
 export async function GET(_request: Request, { params }: { params: { saleId: string } }) {
   const supabase = createClient();
@@ -35,7 +35,7 @@ export async function GET(_request: Request, { params }: { params: { saleId: str
 
   const currencyCode = String((settings as { currency_code?: string } | null)?.currency_code ?? "INR");
   const pdfBytes = await buildInvoicePdf({
-    storeName: String((settings as { store_name?: string } | null)?.store_name ?? "MediCore Store"),
+    storeName: normalizeStoreName((settings as { store_name?: string | null } | null)?.store_name ?? BRAND_NAME),
     storeAddress: (settings as { store_address?: string | null } | null)?.store_address ?? null,
     storeContact: (settings as { store_contact?: string | null } | null)?.store_contact ?? null,
     invoiceNumber: String((sale as { invoice_number?: string }).invoice_number ?? "Invoice"),

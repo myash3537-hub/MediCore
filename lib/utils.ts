@@ -1,6 +1,8 @@
 import { type ClassValue, clsx } from "clsx";
 import { OnlinePaymentMethod, PaymentMethod } from "@/lib/types";
 
+export const BRAND_NAME = "THE SR'S PHARMACY";
+
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
 }
@@ -65,4 +67,14 @@ export function initialsFromName(value: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
+}
+
+export function normalizeStoreName(value?: string | null) {
+  const trimmedValue = value?.trim();
+
+  if (!trimmedValue || trimmedValue === "MediCore Store" || trimmedValue === "MediCore") {
+    return BRAND_NAME;
+  }
+
+  return trimmedValue;
 }

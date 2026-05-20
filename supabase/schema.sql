@@ -258,7 +258,7 @@ create table if not exists public.notifications (
 
 create table if not exists public.store_settings (
   id uuid primary key default gen_random_uuid(),
-  store_name text not null default 'MediCore Store',
+  store_name text not null default 'THE SR''S PHARMACY',
   store_address text,
   store_contact text,
   tax_enabled boolean not null default true,
@@ -368,7 +368,7 @@ create policy "audit_logs_admin_select" on public.audit_logs for select using (p
 create policy "audit_logs_staff_insert" on public.audit_logs for insert with check (public.is_staff());
 
 insert into public.store_settings (id, store_name, tax_enabled, tax_rate, expiry_alert_days, default_low_stock_threshold)
-select gen_random_uuid(), 'MediCore Store', true, 5, 45, 10
+select gen_random_uuid(), 'THE SR''S PHARMACY', true, 5, 45, 10
 where not exists (select 1 from public.store_settings);
 
 create or replace view public.inventory_snapshot as

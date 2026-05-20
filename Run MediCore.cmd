@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-title MediCore Launcher
+title THE SR'S PHARMACY Launcher
 
 set "VALIDATE_ONLY=0"
 set "OPEN_BROWSER=1"
@@ -28,7 +28,7 @@ if /I "%~1"=="--validate" (
 
 echo.
 echo ==========================================
-echo           MediCore Launcher
+echo      THE SR'S PHARMACY Launcher
 echo ==========================================
 echo.
 echo Cleared local proxy variables for this run.
@@ -40,7 +40,7 @@ if not exist ".env.local" (
     echo Created .env.local from .env.example.
   )
 
-  echo MediCore needs a configured .env.local file before it can run.
+  echo THE SR'S PHARMACY needs a configured .env.local file before it can run.
   echo.
   echo Fill in these 3 values inside .env.local:
   echo 1. NEXT_PUBLIC_SUPABASE_URL
@@ -72,11 +72,11 @@ if not exist "node_modules" (
 )
 
 if "%VALIDATE_ONLY%"=="1" (
-  echo MediCore launcher validation passed.
+  echo THE SR'S PHARMACY launcher validation passed.
   exit /b 0
 )
 
-echo Starting MediCore on http://localhost:%APP_PORT%
+echo Starting THE SR'S PHARMACY on http://localhost:%APP_PORT%
 for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":%APP_PORT% .*LISTENING"') do (
   echo Found an older process already using port %APP_PORT%. Closing it now...
   taskkill /PID %%P /F >nul 2>&1
@@ -84,11 +84,11 @@ for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":%APP_PORT% .*LISTENIN
 echo Keep this window open while the app is running.
 echo.
 
-echo Building MediCore for launch...
+echo Building THE SR'S PHARMACY for launch...
 call npm.cmd run build
 if errorlevel 1 (
   echo.
-  echo MediCore could not be built.
+  echo THE SR'S PHARMACY could not be built.
   pause
   exit /b 1
 )
@@ -101,9 +101,9 @@ if "%OPEN_BROWSER%"=="1" (
 call npm.cmd run start -- --hostname 127.0.0.1 --port %APP_PORT%
 
 echo.
-echo The MediCore server exited.
+echo THE SR'S PHARMACY server exited.
 echo If the browser says connection refused, reopen this file and keep this window visible.
 
 echo.
-echo MediCore has stopped.
+echo THE SR'S PHARMACY has stopped.
 pause

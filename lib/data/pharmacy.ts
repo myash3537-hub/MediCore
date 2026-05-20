@@ -3,6 +3,7 @@ import { format, parseISO, startOfDay, startOfMonth, subDays } from "date-fns";
 import { requireAuthenticated, requireRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AuditLog, ChartDatum, InventorySnapshotRow, OnlinePaymentMethod, PaymentMethod, Profile, PurchaseSummary, SaleSummary, StoreSettings, Supplier } from "@/lib/types";
+import { normalizeStoreName } from "@/lib/utils";
 
 function toNumber(value: unknown) {
   return Number(value ?? 0);
@@ -34,7 +35,14 @@ export async function getStoreSettings() {
   await requireAuthenticated();
   const supabase = createAdminClient();
   const { data } = await supabase.from("store_settings").select("*").limit(1).maybeSingle();
-  return (data as StoreSettings | null) ?? null;
+  if (!data) {
+    return null;
+  }
+
+  return {
+    ...(data as StoreSettings),
+    store_name: normalizeStoreName((data as StoreSettings).store_name)
+  };
 }
 
 export async function getSuppliers() {

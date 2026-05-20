@@ -29,7 +29,7 @@ export default async function LoginPage({
             <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
               <ShieldCheck className="h-5 w-5" />
             </span>
-            MediCore
+            THE SR&apos;S PHARMACY
           </div>
 
           <div className="relative space-y-6">

@@ -24,7 +24,7 @@ export function AppShell({
               <div className="relative flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <span className="inline-flex items-center rounded-full border border-brand-200/70 bg-brand-50/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-brand-800 shadow-sm">
-                    MediCore operations
+                    THE SR&apos;S PHARMACY operations
                   </span>
                   <h1 className="mt-3 font-display text-2xl font-semibold tracking-tight text-slate-950 sm:text-[2.2rem]">
                     Retail pharmacy command center
