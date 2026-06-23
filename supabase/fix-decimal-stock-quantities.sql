@@ -176,7 +176,7 @@ as $$
 declare
   v_purchase_id uuid;
   v_item jsonb;
-  v_batch_id uuid;
+  v_batch_id uuid;3 
   v_line_total numeric(12, 2);
   v_subtotal numeric(12, 2) := 0;
 begin

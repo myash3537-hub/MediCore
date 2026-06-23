@@ -16,9 +16,20 @@ type CartItem = InventorySnapshotRow & {
 
 const paymentMethods: PaymentMethod[] = ["Cash", "UPI", "Card", "Split"];
 const onlinePaymentMethods: OnlinePaymentMethod[] = ["UPI", "Card"];
+const saleQuantityStep = 0.1;
+
+function roundSaleQuantity(value: number) {
+  return Number(value.toFixed(2));
+}
 
 function minimumSaleQuantity(stockQuantity: number) {
-  return stockQuantity > 0 && stockQuantity < 1 ? Number(stockQuantity.toFixed(2)) : 1;
+  return stockQuantity > 0 && stockQuantity < saleQuantityStep ? roundSaleQuantity(stockQuantity) : saleQuantityStep;
+}
+
+function clampSaleQuantity(stockQuantity: number, value: number) {
+  const minimumQuantity = minimumSaleQuantity(stockQuantity);
+  const nextQuantity = Number.isFinite(value) && value > 0 ? value : minimumQuantity;
+  return roundSaleQuantity(Math.max(minimumQuantity, Math.min(nextQuantity, stockQuantity)));
 }
 
 export function PosForm({
@@ -90,7 +101,7 @@ export function PosForm({
           entry.batch_id === item.batch_id
             ? {
                 ...entry,
-                quantity: Math.min(entry.quantity + 1, entry.stock_quantity)
+                quantity: clampSaleQuantity(entry.stock_quantity, entry.quantity + saleQuantityStep)
               }
             : entry
         );
@@ -112,7 +123,7 @@ export function PosForm({
         entry.batch_id === batchId
           ? {
               ...entry,
-              quantity: Math.max(minimumSaleQuantity(entry.stock_quantity), Math.min(value || minimumSaleQuantity(entry.stock_quantity), entry.stock_quantity))
+              quantity: clampSaleQuantity(entry.stock_quantity, value)
             }
           : entry
       )
@@ -129,7 +140,7 @@ export function PosForm({
       return;
     }
 
-    updateQuantity(batchId, currentItem.quantity + 1);
+    updateQuantity(batchId, currentItem.quantity + saleQuantityStep);
   }
 
   function decrementQuantity(batchId: string) {
@@ -138,7 +149,7 @@ export function PosForm({
       return;
     }
 
-    updateQuantity(batchId, currentItem.quantity - 1);
+    updateQuantity(batchId, currentItem.quantity - saleQuantityStep);
   }
 
   function splitEvenly() {
@@ -344,7 +355,7 @@ export function PosForm({
                           type="number"
                           min={minimumSaleQuantity(item.stock_quantity)}
                           max={item.stock_quantity}
-                          step="0.01"
+                          step={saleQuantityStep}
                           value={item.quantity}
                           onChange={(event) => updateQuantity(item.batch_id, Number(event.target.value) || minimumSaleQuantity(item.stock_quantity))}
                         />
