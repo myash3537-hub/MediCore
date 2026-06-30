@@ -44,6 +44,10 @@ function perTabletPrice(item: InventorySnapshotRow) {
   return item.selling_price / Math.max(1, item.tablets_per_strip || 10);
 }
 
+function toMoney(value: number) {
+  return Number(value.toFixed(2));
+}
+
 export function PosForm({
   stockRows,
   settings
@@ -59,6 +63,7 @@ export function PosForm({
   const [onlineAmount, setOnlineAmount] = useState(0);
   const [onlinePaymentMethod, setOnlinePaymentMethod] = useState<OnlinePaymentMethod>("UPI");
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [discountPercent, setDiscountPercent] = useState(0);
   const [manualTax, setManualTax] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
 
@@ -81,6 +86,14 @@ export function PosForm({
   const taxAmount = manualTax ?? autoTax;
   const totalAmount = Math.max(subtotal - discountAmount + taxAmount, 0);
   const isSplitPayment = paymentMethod === "Split";
+
+  useEffect(() => {
+    if (discountPercent <= 0) {
+      return;
+    }
+
+    setDiscountAmount(toMoney((subtotal * Math.min(discountPercent, 100)) / 100));
+  }, [discountPercent, subtotal]);
 
   useEffect(() => {
     if (paymentMethod === "Cash") {
@@ -168,6 +181,17 @@ export function PosForm({
     const halfAmount = Number((totalAmount / 2).toFixed(2));
     setCashAmount(halfAmount);
     setOnlineAmount(Number((totalAmount - halfAmount).toFixed(2)));
+  }
+
+  function updateDiscountAmount(value: number) {
+    setDiscountPercent(0);
+    setDiscountAmount(toMoney(Math.max(0, value)));
+  }
+
+  function updateDiscountPercent(value: number) {
+    const nextPercent = Math.max(0, Math.min(Number.isFinite(value) ? value : 0, 100));
+    setDiscountPercent(nextPercent);
+    setDiscountAmount(toMoney((subtotal * nextPercent) / 100));
   }
 
   return (
@@ -391,10 +415,18 @@ export function PosForm({
             )}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-800">Discount amount</label>
-              <Input type="number" min={0} step="0.01" value={discountAmount} onChange={(event) => setDiscountAmount(Number(event.target.value) || 0)} />
+              <Input type="number" min={0} step="0.01" value={discountAmount} onChange={(event) => updateDiscountAmount(Number(event.target.value) || 0)} />
+              <p className="text-xs text-slate-500">Use this for a direct rupee discount.</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-800">Discount percent</label>
+              <Input type="number" min={0} max={100} step="0.01" value={discountPercent} onChange={(event) => updateDiscountPercent(Number(event.target.value) || 0)} />
+              <p className="text-xs text-slate-500">
+                {discountPercent > 0 ? `${discountPercent}% = ${formatCurrency(discountAmount, settings?.currency_code ?? "INR")} off` : "Optional percent discount."}
+              </p>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-800">Tax amount</label>
