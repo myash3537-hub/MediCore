@@ -39,43 +39,45 @@ export default async function PurchasesPage({
 
       <PurchaseForm medicines={data.medicines} suppliers={data.suppliers} defaultLowStockThreshold={settings?.default_low_stock_threshold ?? 10} />
 
-      <Card>
-        <CardHeader title="Recent purchase history" description="Track supplier receipts, invoice references, and procurement totals." action={<Badge variant="accent">{data.recentPurchases.length} recent receipts</Badge>} />
-        <Table>
-          <TableHead>
-            <tr>
-              <TableHeaderCell>Invoice</TableHeaderCell>
-              <TableHeaderCell>Date</TableHeaderCell>
-              <TableHeaderCell>Supplier</TableHeaderCell>
-              <TableHeaderCell>Total</TableHeaderCell>
-              <TableHeaderCell>Receipt</TableHeaderCell>
-            </tr>
-          </TableHead>
-          <TableBody>
-            {data.recentPurchases.length ? (
-              data.recentPurchases.map((purchase) => (
-                <TableRow key={purchase.id}>
-                  <TableCell>{purchase.invoice_number || "Manual receipt"}</TableCell>
-                  <TableCell>{purchase.purchase_date.slice(0, 10)}</TableCell>
-                  <TableCell>{purchase.suppliers?.name || "Supplier not linked"}</TableCell>
-                  <TableCell>{formatCurrency(purchase.total_amount, currency)}</TableCell>
-                  <TableCell>
-                    <span className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700">
-                      <Receipt className="h-4 w-4" />
-                      Logged
-                    </span>
+      <Card className="overflow-hidden">
+        <CardHeader title="All purchase history" description="Complete supplier receipt history from the first purchase to the latest." action={<Badge variant="accent">{data.recentPurchases.length} receipts</Badge>} />
+        <div className="scrollbar-thin max-h-[32rem] overflow-y-auto pr-2">
+          <Table>
+            <TableHead>
+              <tr>
+                <TableHeaderCell>Invoice</TableHeaderCell>
+                <TableHeaderCell>Date</TableHeaderCell>
+                <TableHeaderCell>Supplier</TableHeaderCell>
+                <TableHeaderCell>Total</TableHeaderCell>
+                <TableHeaderCell>Receipt</TableHeaderCell>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {data.recentPurchases.length ? (
+                data.recentPurchases.map((purchase) => (
+                  <TableRow key={purchase.id}>
+                    <TableCell>{purchase.invoice_number || "Manual receipt"}</TableCell>
+                    <TableCell>{purchase.purchase_date.slice(0, 10)}</TableCell>
+                    <TableCell>{purchase.suppliers?.name || "Supplier not linked"}</TableCell>
+                    <TableCell>{formatCurrency(purchase.total_amount, currency)}</TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700">
+                        <Receipt className="h-4 w-4" />
+                        Logged
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-sm text-slate-500">
+                    No purchase receipts have been recorded yet.
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={5} className="text-sm text-slate-500">
-                  No purchase receipts have been recorded yet.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
     </div>
   );

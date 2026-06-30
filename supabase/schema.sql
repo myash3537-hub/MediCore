@@ -20,7 +20,7 @@ declare
   v_item jsonb;
   v_line_total numeric(12, 2);
   v_subtotal numeric(12, 2) := 0;
-  v_batch_stock numeric(12, 2);
+  v_batch_stock numeric(12, 4);
   v_total_amount numeric(12, 2);
   v_cash_amount numeric(12, 2) := 0;
   v_online_amount numeric(12, 2) := 0;
@@ -51,15 +51,15 @@ begin
       raise exception 'Batch not found';
     end if;
 
-    if v_batch_stock < (v_item ->> 'quantity')::numeric(12, 2) then
+    if v_batch_stock < (v_item ->> 'quantity')::numeric(12, 4) then
       raise exception 'Insufficient stock for selected batch';
     end if;
 
-    v_line_total := ((v_item ->> 'quantity')::numeric(12, 2) * (v_item ->> 'unit_price')::numeric(12, 2));
+    v_line_total := ((v_item ->> 'quantity')::numeric(12, 4) * (v_item ->> 'unit_price')::numeric(12, 2));
     v_subtotal := v_subtotal + v_line_total;
 
     update public.medicine_batches
-    set stock_quantity = stock_quantity - (v_item ->> 'quantity')::numeric(12, 2)
+    set stock_quantity = stock_quantity - (v_item ->> 'quantity')::numeric(12, 4)
     where id = (v_item ->> 'batch_id')::uuid;
 
     insert into public.sale_items (
@@ -74,7 +74,7 @@ begin
       v_sale_id,
       (v_item ->> 'medicine_id')::uuid,
       (v_item ->> 'batch_id')::uuid,
-      (v_item ->> 'quantity')::numeric(12, 2),
+      (v_item ->> 'quantity')::numeric(12, 4),
       (v_item ->> 'unit_price')::numeric(12, 2),
       v_line_total
     );
@@ -84,7 +84,7 @@ begin
       (v_item ->> 'medicine_id')::uuid,
       (v_item ->> 'batch_id')::uuid,
       'sale',
-      -1 * (v_item ->> 'quantity')::numeric(12, 2),
+      -1 * (v_item ->> 'quantity')::numeric(12, 4),
       v_sale_id,
       'POS sale',
       auth.uid()
@@ -146,9 +146,10 @@ create table if not exists public.medicine_batches (
   supplier_id uuid references public.suppliers(id) on delete set null,
   batch_number text not null,
   expiry_date date not null,
-  stock_quantity numeric(12, 2) not null default 0 check (stock_quantity >= 0),
+  stock_quantity numeric(12, 4) not null default 0 check (stock_quantity >= 0),
   purchase_price numeric(12, 2) not null check (purchase_price >= 0),
   selling_price numeric(12, 2) not null check (selling_price >= 0),
+  tablets_per_strip integer not null default 10 check (tablets_per_strip >= 1),
   low_stock_threshold integer not null default 10 check (low_stock_threshold >= 0),
   manufactured_on date,
   created_at timestamptz not null default timezone('utc', now()),
@@ -173,7 +174,7 @@ create table if not exists public.purchase_items (
   purchase_id uuid not null references public.purchases(id) on delete cascade,
   medicine_id uuid not null references public.medicines(id) on delete restrict,
   batch_id uuid not null references public.medicine_batches(id) on delete restrict,
-  quantity numeric(12, 2) not null check (quantity > 0),
+  quantity numeric(12, 4) not null check (quantity > 0),
   purchase_price numeric(12, 2) not null check (purchase_price >= 0),
   selling_price numeric(12, 2) not null check (selling_price >= 0),
   line_total numeric(12, 2) not null default 0
@@ -210,7 +211,7 @@ create table if not exists public.sale_items (
   sale_id uuid not null references public.sales(id) on delete cascade,
   medicine_id uuid not null references public.medicines(id) on delete restrict,
   batch_id uuid not null references public.medicine_batches(id) on delete restrict,
-  quantity numeric(12, 2) not null check (quantity > 0),
+  quantity numeric(12, 4) not null check (quantity > 0),
   unit_price numeric(12, 2) not null check (unit_price >= 0),
   line_total numeric(12, 2) not null default 0
 );
@@ -230,7 +231,7 @@ create table if not exists public.sale_return_items (
   sale_return_id uuid not null references public.sales_returns(id) on delete cascade,
   sale_item_id uuid not null references public.sale_items(id) on delete restrict,
   batch_id uuid not null references public.medicine_batches(id) on delete restrict,
-  quantity numeric(12, 2) not null check (quantity > 0),
+  quantity numeric(12, 4) not null check (quantity > 0),
   refund_amount numeric(12, 2) not null default 0
 );
 
@@ -239,7 +240,7 @@ create table if not exists public.stock_movements (
   medicine_id uuid not null references public.medicines(id) on delete restrict,
   batch_id uuid not null references public.medicine_batches(id) on delete restrict,
   movement_type public.stock_movement_type not null,
-  quantity numeric(12, 2) not null,
+  quantity numeric(12, 4) not null,
   reference_id uuid,
   notes text,
   created_by uuid references public.profiles(id) on delete set null,
@@ -383,6 +384,7 @@ select
   b.stock_quantity,
   b.purchase_price,
   b.selling_price,
+  b.tablets_per_strip,
   b.low_stock_threshold,
   s.name as supplier_name,
   (b.stock_quantity <= b.low_stock_threshold) as is_low_stock
@@ -452,6 +454,7 @@ begin
       stock_quantity,
       purchase_price,
       selling_price,
+      tablets_per_strip,
       low_stock_threshold
     )
     values (
@@ -459,9 +462,10 @@ begin
       coalesce((v_item ->> 'supplier_id')::uuid, p_supplier_id),
       v_item ->> 'batch_number',
       (v_item ->> 'expiry_date')::date,
-      greatest((v_item ->> 'quantity')::numeric(12, 2), 0),
+      greatest((v_item ->> 'quantity')::numeric(12, 4), 0),
       (v_item ->> 'purchase_price')::numeric(12, 2),
       (v_item ->> 'selling_price')::numeric(12, 2),
+      coalesce((v_item ->> 'tablets_per_strip')::integer, 10),
       coalesce((v_item ->> 'low_stock_threshold')::integer, (select default_low_stock_threshold from public.store_settings limit 1), 10)
     )
     on conflict (medicine_id, batch_number)
@@ -470,11 +474,12 @@ begin
       expiry_date = excluded.expiry_date,
       purchase_price = excluded.purchase_price,
       selling_price = excluded.selling_price,
+      tablets_per_strip = excluded.tablets_per_strip,
       supplier_id = excluded.supplier_id,
       low_stock_threshold = excluded.low_stock_threshold
     returning id into v_batch_id;
 
-    v_line_total := ((v_item ->> 'quantity')::numeric(12, 2) * (v_item ->> 'purchase_price')::numeric(12, 2));
+    v_line_total := ((v_item ->> 'quantity')::numeric(12, 4) * (v_item ->> 'purchase_price')::numeric(12, 2));
     v_subtotal := v_subtotal + v_line_total;
 
     insert into public.purchase_items (
@@ -490,7 +495,7 @@ begin
       v_purchase_id,
       (v_item ->> 'medicine_id')::uuid,
       v_batch_id,
-      (v_item ->> 'quantity')::numeric(12, 2),
+      (v_item ->> 'quantity')::numeric(12, 4),
       (v_item ->> 'purchase_price')::numeric(12, 2),
       (v_item ->> 'selling_price')::numeric(12, 2),
       v_line_total
@@ -501,7 +506,7 @@ begin
       (v_item ->> 'medicine_id')::uuid,
       v_batch_id,
       'purchase',
-      (v_item ->> 'quantity')::numeric(12, 2),
+      (v_item ->> 'quantity')::numeric(12, 4),
       v_purchase_id,
       concat('Purchase invoice ', coalesce(p_invoice_number, 'manual')),
       auth.uid()
@@ -532,8 +537,8 @@ as $$
 declare
   v_return_id uuid;
   v_item jsonb;
-  v_sold_quantity numeric(12, 2);
-  v_returned_quantity numeric(12, 2);
+  v_sold_quantity numeric(12, 4);
+  v_returned_quantity numeric(12, 4);
   v_batch_id uuid;
 begin
   perform public.ensure_staff_access();
@@ -559,12 +564,12 @@ begin
     from public.sale_return_items
     where sale_item_id = (v_item ->> 'sale_item_id')::uuid;
 
-    if v_returned_quantity + (v_item ->> 'quantity')::numeric(12, 2) > v_sold_quantity then
+    if v_returned_quantity + (v_item ->> 'quantity')::numeric(12, 4) > v_sold_quantity then
       raise exception 'Return quantity exceeds sold quantity';
     end if;
 
     update public.medicine_batches
-    set stock_quantity = stock_quantity + (v_item ->> 'quantity')::numeric(12, 2)
+    set stock_quantity = stock_quantity + (v_item ->> 'quantity')::numeric(12, 4)
     where id = v_batch_id;
 
     insert into public.sale_return_items (
@@ -578,11 +583,11 @@ begin
       v_return_id,
       (v_item ->> 'sale_item_id')::uuid,
       v_batch_id,
-      (v_item ->> 'quantity')::numeric(12, 2),
+      (v_item ->> 'quantity')::numeric(12, 4),
       (v_item ->> 'refund_amount')::numeric(12, 2)
     );
     insert into public.stock_movements (medicine_id, batch_id, movement_type, quantity, reference_id, notes, created_by)
-    select medicine_id, batch_id, 'return', (v_item ->> 'quantity')::numeric(12, 2), v_return_id, p_reason, auth.uid()
+    select medicine_id, batch_id, 'return', (v_item ->> 'quantity')::numeric(12, 4), v_return_id, p_reason, auth.uid()
     from public.sale_items
     where id = (v_item ->> 'sale_item_id')::uuid;
   end loop;

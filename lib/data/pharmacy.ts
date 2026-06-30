@@ -5,8 +5,30 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { AuditLog, ChartDatum, InventorySnapshotRow, OnlinePaymentMethod, PaymentMethod, Profile, PurchaseSummary, SaleSummary, StoreSettings, Supplier } from "@/lib/types";
 import { normalizeStoreName } from "@/lib/utils";
 
+const PAGE_SIZE = 1000;
+
+type RangeQuery = {
+  range: (from: number, to: number) => PromiseLike<{ data: unknown[] | null }>;
+};
+
 function toNumber(value: unknown) {
   return Number(value ?? 0);
+}
+
+async function fetchAllRows<T>(queryFactory: () => RangeQuery) {
+  const rows: T[] = [];
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data } = await queryFactory().range(from, from + PAGE_SIZE - 1);
+    const page = ((data ?? []) as T[]) ?? [];
+    rows.push(...page);
+
+    if (page.length < PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return rows;
 }
 
 function buildDailySeries(rows: Array<{ sale_date: string; total_amount: number }>) {
@@ -55,12 +77,13 @@ export async function getSuppliers() {
 export async function getInventorySnapshot() {
   await requireAuthenticated();
   const supabase = createAdminClient();
-  const { data } = await supabase.from("inventory_snapshot").select("*").order("medicine_name");
-  return ((data as InventorySnapshotRow[] | null) ?? []).map((row) => ({
+  const data = await fetchAllRows<InventorySnapshotRow>(() => supabase.from("inventory_snapshot").select("*").order("medicine_name"));
+  return data.map((row) => ({
     ...row,
     stock_quantity: toNumber(row.stock_quantity),
     purchase_price: toNumber(row.purchase_price),
     selling_price: toNumber(row.selling_price),
+    tablets_per_strip: Math.max(1, Math.round(toNumber(row.tablets_per_strip || 10))),
     low_stock_threshold: toNumber(row.low_stock_threshold)
   }));
 }
@@ -138,7 +161,9 @@ export async function getDashboardData() {
     online_payment_method: (sale.online_payment_method as OnlinePaymentMethod | null | undefined) ?? null
   }));
 
-  const lowStockItems = inventoryRows.filter((item) => item.stock_quantity <= item.low_stock_threshold).slice(0, 8);
+  const lowStockItems = inventoryRows
+    .filter((item) => item.stock_quantity <= item.low_stock_threshold)
+    .sort((a, b) => a.stock_quantity - b.stock_quantity);
   const expiryAlertDate = new Date();
   expiryAlertDate.setDate(expiryAlertDate.getDate() + (settings?.expiry_alert_days ?? 45));
   const expiringItems = inventoryRows
@@ -146,8 +171,7 @@ export async function getDashboardData() {
       const expiryDate = parseISO(item.expiry_date);
       return expiryDate <= expiryAlertDate;
     })
-    .sort((a, b) => a.expiry_date.localeCompare(b.expiry_date))
-    .slice(0, 8);
+    .sort((a, b) => a.expiry_date.localeCompare(b.expiry_date));
 
   const todaySales = trendRows
     .filter((row) => format(parseISO(row.sale_date), "yyyy-MM-dd") === format(today, "yyyy-MM-dd"))
@@ -196,16 +220,17 @@ export async function getBillingData() {
   const [settings, inventoryRows, recentSales, editableSalesRows] = await Promise.all([
     getStoreSettings(),
     getInventorySnapshot(),
-    getRecentSales(8),
+    getRecentSales(),
     profile.role === "admin"
-      ? supabase
-          .from("sales")
-          .select(
-            "id, invoice_number, sale_date, customer_name, subtotal, discount_amount, tax_amount, total_amount, payment_method, cash_amount, online_amount, online_payment_method, notes, sale_items(id, medicine_id, batch_id, quantity, unit_price, line_total, medicines(name), medicine_batches(batch_number))"
-          )
-          .order("sale_date", { ascending: false })
-          .limit(8)
-      : Promise.resolve({ data: [] })
+      ? fetchAllRows<Record<string, unknown>>(() =>
+          supabase
+            .from("sales")
+            .select(
+              "id, invoice_number, sale_date, customer_name, subtotal, discount_amount, tax_amount, total_amount, payment_method, cash_amount, online_amount, online_payment_method, notes, sale_items(id, medicine_id, batch_id, quantity, unit_price, line_total, medicines(name), medicine_batches(batch_number))"
+            )
+            .order("sale_date", { ascending: false })
+        )
+      : Promise.resolve([])
   ]);
 
   return {
@@ -213,20 +238,20 @@ export async function getBillingData() {
     settings,
     stockRows: inventoryRows.filter((item) => item.stock_quantity > 0),
     recentSales,
-    editableSales: (editableSalesRows.data as Array<Record<string, unknown>> | null) ?? []
+    editableSales: editableSalesRows
   };
 }
 
-export async function getRecentSales(limit = 10) {
+export async function getRecentSales(limit?: number) {
   await requireAuthenticated();
   const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("sales")
-    .select("id, invoice_number, sale_date, customer_name, subtotal, discount_amount, tax_amount, total_amount, payment_method, cash_amount, online_amount, online_payment_method")
-    .order("sale_date", { ascending: false })
-    .limit(limit);
+  const selectColumns = "id, invoice_number, sale_date, customer_name, subtotal, discount_amount, tax_amount, total_amount, payment_method, cash_amount, online_amount, online_payment_method";
+  const data =
+    typeof limit === "number"
+      ? (((await supabase.from("sales").select(selectColumns).order("sale_date", { ascending: false }).limit(limit)).data as SaleSummary[] | null) ?? [])
+      : await fetchAllRows<SaleSummary>(() => supabase.from("sales").select(selectColumns).order("sale_date", { ascending: false }));
 
-  return (((data as SaleSummary[] | null) ?? []) as SaleSummary[]).map((sale) => ({
+  return data.map((sale) => ({
     ...sale,
     subtotal: toNumber(sale.subtotal),
     discount_amount: toNumber(sale.discount_amount),
@@ -243,7 +268,7 @@ export async function getPurchaseData() {
   const [suppliers, medicines, recentPurchases] = await Promise.all([
     getSuppliers(),
     getMedicinesCatalog(),
-    getRecentPurchases(8)
+    getRecentPurchases()
   ]);
 
   return {
@@ -253,16 +278,16 @@ export async function getPurchaseData() {
   };
 }
 
-export async function getRecentPurchases(limit = 10) {
+export async function getRecentPurchases(limit?: number) {
   await requireAuthenticated();
   const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("purchases")
-    .select("id, invoice_number, purchase_date, subtotal, total_amount, supplier_id, suppliers(id, name)")
-    .order("purchase_date", { ascending: false })
-    .limit(limit);
+  const selectColumns = "id, invoice_number, purchase_date, subtotal, total_amount, supplier_id, suppliers(id, name)";
+  const data =
+    typeof limit === "number"
+      ? (((await supabase.from("purchases").select(selectColumns).order("purchase_date", { ascending: false }).limit(limit)).data as PurchaseSummary[] | null) ?? [])
+      : await fetchAllRows<PurchaseSummary>(() => supabase.from("purchases").select(selectColumns).order("purchase_date", { ascending: false }));
 
-  return (((data as PurchaseSummary[] | null) ?? []) as PurchaseSummary[]).map((purchase) => ({
+  return data.map((purchase) => ({
     ...purchase,
     subtotal: toNumber(purchase.subtotal),
     total_amount: toNumber(purchase.total_amount)
@@ -274,41 +299,44 @@ export async function getReturnsData() {
   const supabase = createAdminClient();
   const [settings, recentReturns, saleCandidates, editableReturns] = await Promise.all([
     getStoreSettings(),
-    supabase
-      .from("sales_returns")
-      .select("id, refund_amount, reason, return_date, sale_id, sales(invoice_number, customer_name)")
-      .order("return_date", { ascending: false })
-      .limit(10),
-    supabase
-      .from("sales")
-      .select("id, invoice_number, customer_name, total_amount, sale_date, sale_items(id, quantity, unit_price, line_total, batch_id, medicine_id, medicines(name), medicine_batches(batch_number))")
-      .order("sale_date", { ascending: false })
-      .limit(12),
+    fetchAllRows<Record<string, unknown>>(() =>
+      supabase
+        .from("sales_returns")
+        .select("id, refund_amount, reason, return_date, sale_id, sales(invoice_number, customer_name)")
+        .order("return_date", { ascending: false })
+    ),
+    fetchAllRows<Record<string, unknown>>(() =>
+      supabase
+        .from("sales")
+        .select("id, invoice_number, customer_name, total_amount, sale_date, sale_items(id, quantity, unit_price, line_total, batch_id, medicine_id, medicines(name), medicine_batches(batch_number, tablets_per_strip))")
+        .order("sale_date", { ascending: false })
+    ),
     profile.role === "admin"
-      ? supabase
-          .from("sales_returns")
-          .select(
-            "id, refund_amount, reason, return_date, sale_id, sales(invoice_number, customer_name), sale_return_items(id, sale_item_id, batch_id, quantity, refund_amount, sale_items(quantity, unit_price, medicines(name), medicine_batches(batch_number)))"
-          )
-          .order("return_date", { ascending: false })
-          .limit(10)
-      : Promise.resolve({ data: [] })
+      ? fetchAllRows<Record<string, unknown>>(() =>
+          supabase
+            .from("sales_returns")
+            .select(
+              "id, refund_amount, reason, return_date, sale_id, sales(invoice_number, customer_name), sale_return_items(id, sale_item_id, batch_id, quantity, refund_amount, sale_items(quantity, unit_price, medicines(name), medicine_batches(batch_number)))"
+            )
+            .order("return_date", { ascending: false })
+        )
+      : Promise.resolve([])
   ]);
 
   return {
     profile,
     settings,
-    recentReturns: (recentReturns.data as Array<Record<string, unknown>> | null) ?? [],
-    saleCandidates: (saleCandidates.data as Array<Record<string, unknown>> | null) ?? [],
-    editableReturns: (editableReturns.data as Array<Record<string, unknown>> | null) ?? []
+    recentReturns,
+    saleCandidates,
+    editableReturns
   };
 }
 
 export async function getReportsData() {
   const [inventoryRows, recentSales, recentPurchases, settings] = await Promise.all([
     getInventorySnapshot(),
-    getRecentSales(31),
-    getRecentPurchases(31),
+    getRecentSales(),
+    getRecentPurchases(),
     getStoreSettings()
   ]);
 

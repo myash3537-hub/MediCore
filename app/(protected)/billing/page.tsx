@@ -53,52 +53,54 @@ export default async function BillingPage({
 
       <PosForm stockRows={data.stockRows} settings={data.settings} />
 
-      <Card>
-        <CardHeader title="Recent invoices" description="Latest POS transactions completed in the store." action={<Badge variant="accent">Realtime</Badge>} />
-        <Table>
-          <TableHead>
-            <tr>
-              <TableHeaderCell>Invoice</TableHeaderCell>
-              <TableHeaderCell>Date</TableHeaderCell>
-              <TableHeaderCell>Customer</TableHeaderCell>
-              <TableHeaderCell>Payment</TableHeaderCell>
-              <TableHeaderCell>Total</TableHeaderCell>
-              <TableHeaderCell>Invoice</TableHeaderCell>
-            </tr>
-          </TableHead>
-          <TableBody>
-            {data.recentSales.length ? (
-              data.recentSales.map((sale) => (
-                <TableRow key={sale.id}>
-                  <TableCell>{sale.invoice_number}</TableCell>
-                  <TableCell>{sale.sale_date.slice(0, 10)}</TableCell>
-                  <TableCell>{sale.customer_name || "Walk-in customer"}</TableCell>
-                  <TableCell>{formatPaymentLabel(sale, currency)}</TableCell>
-                  <TableCell>{formatCurrency(sale.total_amount, currency)}</TableCell>
-                  <TableCell>
-                    <Link href={`/api/invoice/${sale.id}`} className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700">
-                      <Receipt className="h-4 w-4" />
-                      PDF
-                    </Link>
+      <Card className="overflow-hidden">
+        <CardHeader title="All invoices" description="Complete POS transaction history from the first sale to the latest." action={<Badge variant="accent">{data.recentSales.length} invoices</Badge>} />
+        <div className="scrollbar-thin max-h-[32rem] overflow-y-auto pr-2">
+          <Table>
+            <TableHead>
+              <tr>
+                <TableHeaderCell>Invoice</TableHeaderCell>
+                <TableHeaderCell>Date</TableHeaderCell>
+                <TableHeaderCell>Customer</TableHeaderCell>
+                <TableHeaderCell>Payment</TableHeaderCell>
+                <TableHeaderCell>Total</TableHeaderCell>
+                <TableHeaderCell>Invoice</TableHeaderCell>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {data.recentSales.length ? (
+                data.recentSales.map((sale) => (
+                  <TableRow key={sale.id}>
+                    <TableCell>{sale.invoice_number}</TableCell>
+                    <TableCell>{sale.sale_date.slice(0, 10)}</TableCell>
+                    <TableCell>{sale.customer_name || "Walk-in customer"}</TableCell>
+                    <TableCell>{formatPaymentLabel(sale, currency)}</TableCell>
+                    <TableCell>{formatCurrency(sale.total_amount, currency)}</TableCell>
+                    <TableCell>
+                      <Link href={`/api/invoice/${sale.id}`} className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700">
+                        <Receipt className="h-4 w-4" />
+                        PDF
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-sm text-slate-500">
+                    No sales have been recorded yet. Complete a sale to generate the first invoice and history row.
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={6} className="text-sm text-slate-500">
-                  No sales have been recorded yet. Complete a sale to generate the first invoice and history row.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
 
       {data.profile.role === "admin" ? (
         <Card>
           <CardHeader
             title="Admin sale controls"
-            description="Edit past sales, update invoice data, and delete incorrect transactions. Invoice PDFs always reflect the latest saved values."
+            description="Edit any saved sale, update invoice data, and delete incorrect transactions. Invoice PDFs always reflect the latest saved values."
             action={<Badge variant="warning">Admin only</Badge>}
           />
           <AdminSaleManager sales={data.editableSales} currency={currency} />

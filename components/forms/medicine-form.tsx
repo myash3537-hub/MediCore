@@ -17,6 +17,7 @@ type MedicineFormValues = {
   stock_quantity?: number;
   purchase_price?: number;
   selling_price?: number;
+  tablets_per_strip?: number;
   low_stock_threshold?: number;
   sku?: string | null;
   description?: string | null;
@@ -83,8 +84,12 @@ export function MedicineForm({
           <Input name="expiry_date" type="date" defaultValue={initial?.expiry_date ?? ""} />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-800">Stock quantity</label>
+          <label className="text-sm font-semibold text-slate-800">Stock quantity (strips)</label>
           <Input name="stock_quantity" type="number" min={0} step="0.01" defaultValue={initial?.stock_quantity ?? 0} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-semibold text-slate-800">Tablets per strip</label>
+          <Input name="tablets_per_strip" type="number" min={1} step={1} defaultValue={initial?.tablets_per_strip ?? 10} />
         </div>
         <div className="space-y-2">
           <label className="text-sm font-semibold text-slate-800">Low stock alert</label>

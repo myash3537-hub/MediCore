@@ -55,7 +55,7 @@ type EditableReturnItemPayload = {
 };
 
 function toQuantity(value: number) {
-  return Number(value.toFixed(2));
+  return Number(value.toFixed(4));
 }
 
 function revalidateOperationsPages() {
@@ -227,6 +227,7 @@ export async function upsertMedicineAction(formData: FormData) {
     const stockQuantity = asNumber(formData.get("stock_quantity"));
     const submittedPurchasePrice = asNumber(formData.get("purchase_price"));
     const sellingPrice = asNumber(formData.get("selling_price"));
+    const tabletsPerStrip = Math.max(1, Math.round(asNumber(formData.get("tablets_per_strip")) || 10));
     const lowStockThreshold = asNumber(formData.get("low_stock_threshold")) || 10;
     let existingBatchRecord: { id: string; stock_quantity: number; purchase_price: number } | null = null;
 
@@ -267,6 +268,7 @@ export async function upsertMedicineAction(formData: FormData) {
       stock_quantity: stockQuantity,
       purchase_price: effectivePurchasePrice,
       selling_price: sellingPrice,
+      tablets_per_strip: tabletsPerStrip,
       low_stock_threshold: lowStockThreshold
     };
 
@@ -330,6 +332,52 @@ export async function archiveMedicineAction(formData: FormData) {
   revalidatePath("/inventory");
   revalidatePath("/dashboard");
   redirect("/inventory");
+}
+
+export async function deleteBatchAction(formData: FormData) {
+  const { profile } = await requireRole("admin");
+  const supabase = createAdminClient();
+  const batchId = asString(formData.get("batch_id"));
+
+  if (!batchId) {
+    redirect("/inventory");
+  }
+
+  const [{ data: batch }, { count: saleItemCount }, { count: purchaseItemCount }, { count: returnItemCount }] = await Promise.all([
+    supabase.from("medicine_batches").select("id, batch_number, medicine_id").eq("id", batchId).maybeSingle(),
+    supabase.from("sale_items").select("id", { count: "exact", head: true }).eq("batch_id", batchId),
+    supabase.from("purchase_items").select("id", { count: "exact", head: true }).eq("batch_id", batchId),
+    supabase.from("sale_return_items").select("id", { count: "exact", head: true }).eq("batch_id", batchId)
+  ]);
+
+  if (!batch) {
+    redirectWithMessage("/inventory", "error", "Batch was not found.");
+  }
+
+  if ((saleItemCount ?? 0) > 0 || (purchaseItemCount ?? 0) > 0 || (returnItemCount ?? 0) > 0) {
+    redirectWithMessage(
+      "/inventory",
+      "error",
+      "This batch is linked to sales, purchases, or returns. Archive the medicine instead, or keep the batch for invoice history."
+    );
+  }
+
+  await supabase.from("stock_movements").delete().eq("batch_id", batchId);
+  const { error } = await supabase.from("medicine_batches").delete().eq("id", batchId);
+
+  if (error) {
+    redirectWithMessage("/inventory", "error", error.message);
+  }
+
+  await recordAuditForUser(profile.id, "medicine_batches", batchId, "deleted", {
+    batch_number: String((batch as { batch_number?: string }).batch_number ?? "")
+  });
+
+  revalidatePath("/inventory");
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  revalidatePath("/billing");
+  redirectWithMessage("/inventory", "success", "Batch deleted successfully.");
 }
 
 export async function recordPurchaseAction(formData: FormData) {

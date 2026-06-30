@@ -13,33 +13,33 @@ export default async function ReportsPage() {
   const data = await getReportsData();
   const currency = data.settings?.currency_code ?? "INR";
   const isAdmin = profile.role === "admin";
-  const weeklySales = data.recentSales.slice(0, 7).reduce((total, row) => total + row.total_amount, 0);
-  const monthlySales = data.recentSales.reduce((total, row) => total + row.total_amount, 0);
+  const latestSaleTotal = data.recentSales[0]?.total_amount ?? 0;
+  const allTimeSales = data.recentSales.reduce((total, row) => total + row.total_amount, 0);
   const purchaseSpend = data.recentPurchases.reduce((total, row) => total + row.total_amount, 0);
 
   return (
     <div className="space-y-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Daily report</p>
-          <p className="mt-3 font-display text-3xl font-semibold text-slate-950">{formatCurrency(data.recentSales[0]?.total_amount ?? 0, currency)}</p>
-          <p className="mt-2 text-sm text-slate-600">Latest invoice value captured today or most recently.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Latest sale</p>
+          <p className="mt-3 font-display text-3xl font-semibold text-slate-950">{formatCurrency(latestSaleTotal, currency)}</p>
+          <p className="mt-2 text-sm text-slate-600">Newest invoice value in the full sales history.</p>
         </Card>
         <Card>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Weekly sales</p>
-          <p className="mt-3 font-display text-3xl font-semibold text-slate-950">{formatCurrency(weeklySales, currency)}</p>
-          <p className="mt-2 text-sm text-slate-600">Last seven recorded sales entries.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Total invoices</p>
+          <p className="mt-3 font-display text-3xl font-semibold text-slate-950">{formatNumber(data.recentSales.length)}</p>
+          <p className="mt-2 text-sm text-slate-600">Every invoice recorded from the first sale to now.</p>
         </Card>
         <Card>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Monthly sales</p>
-          <p className="mt-3 font-display text-3xl font-semibold text-slate-950">{formatCurrency(monthlySales, currency)}</p>
-          <p className="mt-2 text-sm text-slate-600">Rolling thirty-one invoice total.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">All-time sales</p>
+          <p className="mt-3 font-display text-3xl font-semibold text-slate-950">{formatCurrency(allTimeSales, currency)}</p>
+          <p className="mt-2 text-sm text-slate-600">Complete revenue total across the full sales ledger.</p>
         </Card>
         {isAdmin ? (
           <Card>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Purchase spend</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">All-time purchases</p>
             <p className="mt-3 font-display text-3xl font-semibold text-slate-950">{formatCurrency(purchaseSpend, currency)}</p>
-            <p className="mt-2 text-sm text-slate-600">Recent procurement outflow across supplier receipts.</p>
+            <p className="mt-2 text-sm text-slate-600">Complete procurement outflow across supplier receipts.</p>
           </Card>
         ) : (
           <Card>
@@ -72,28 +72,30 @@ export default async function ReportsPage() {
       </Card>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <Card>
-          <CardHeader title="Inventory report" description="Snapshot of current active stock by batch." action={<FileSpreadsheet className="h-5 w-5 text-brand-700" />} />
-          <Table>
-            <TableHead>
-              <tr>
-                <TableHeaderCell>Medicine</TableHeaderCell>
-                <TableHeaderCell>Batch</TableHeaderCell>
-                <TableHeaderCell>Stock</TableHeaderCell>
-                <TableHeaderCell>MRP</TableHeaderCell>
-              </tr>
-            </TableHead>
-            <TableBody>
-              {data.inventoryRows.slice(0, 10).map((row) => (
-                <TableRow key={row.batch_id}>
-                  <TableCell>{row.medicine_name}</TableCell>
-                  <TableCell>{row.batch_number}</TableCell>
-                  <TableCell>{formatQuantity(row.stock_quantity)}</TableCell>
-                  <TableCell>{formatCurrency(row.selling_price, currency)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <Card className="overflow-hidden">
+          <CardHeader title="Inventory report" description="Complete active stock snapshot by batch." action={<FileSpreadsheet className="h-5 w-5 text-brand-700" />} />
+          <div className="scrollbar-thin max-h-[28rem] overflow-y-auto pr-2">
+            <Table>
+              <TableHead>
+                <tr>
+                  <TableHeaderCell>Medicine</TableHeaderCell>
+                  <TableHeaderCell>Batch</TableHeaderCell>
+                  <TableHeaderCell>Stock</TableHeaderCell>
+                  <TableHeaderCell>MRP</TableHeaderCell>
+                </tr>
+              </TableHead>
+              <TableBody>
+                {data.inventoryRows.map((row) => (
+                  <TableRow key={row.batch_id}>
+                    <TableCell>{row.medicine_name}</TableCell>
+                    <TableCell>{row.batch_number}</TableCell>
+                    <TableCell>{formatQuantity(row.stock_quantity)}</TableCell>
+                    <TableCell>{formatCurrency(row.selling_price, currency)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
 
         <Card className="overflow-hidden">
@@ -125,7 +127,7 @@ export default async function ReportsPage() {
 
       <section className="grid gap-6 xl:grid-cols-2">
         <Card className="overflow-hidden">
-          <CardHeader title="Sales report" description="Latest billing transactions available for operational or accounting review." />
+          <CardHeader title="Sales report" description="Complete billing transaction history for operational or accounting review." />
           <div className="scrollbar-thin max-h-[28rem] overflow-y-auto pr-2">
             <Table>
               <TableHead>
@@ -151,28 +153,30 @@ export default async function ReportsPage() {
         </Card>
 
         {isAdmin ? (
-          <Card>
-            <CardHeader title="Purchase report" description="Latest supplier purchases available for reconciliation." />
-            <Table>
-              <TableHead>
-                <tr>
-                  <TableHeaderCell>Invoice</TableHeaderCell>
-                  <TableHeaderCell>Date</TableHeaderCell>
-                  <TableHeaderCell>Supplier</TableHeaderCell>
-                  <TableHeaderCell>Total</TableHeaderCell>
-                </tr>
-              </TableHead>
-              <TableBody>
-                {data.recentPurchases.slice(0, 10).map((purchase) => (
-                  <TableRow key={purchase.id}>
-                    <TableCell>{purchase.invoice_number || "Manual receipt"}</TableCell>
-                    <TableCell>{purchase.purchase_date.slice(0, 10)}</TableCell>
-                    <TableCell>{purchase.suppliers?.name || "Supplier not linked"}</TableCell>
-                    <TableCell>{formatCurrency(purchase.total_amount, currency)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <Card className="overflow-hidden">
+            <CardHeader title="Purchase report" description="Complete supplier purchase history available for reconciliation." />
+            <div className="scrollbar-thin max-h-[28rem] overflow-y-auto pr-2">
+              <Table>
+                <TableHead>
+                  <tr>
+                    <TableHeaderCell>Invoice</TableHeaderCell>
+                    <TableHeaderCell>Date</TableHeaderCell>
+                    <TableHeaderCell>Supplier</TableHeaderCell>
+                    <TableHeaderCell>Total</TableHeaderCell>
+                  </tr>
+                </TableHead>
+                <TableBody>
+                  {data.recentPurchases.map((purchase) => (
+                    <TableRow key={purchase.id}>
+                      <TableCell>{purchase.invoice_number || "Manual receipt"}</TableCell>
+                      <TableCell>{purchase.purchase_date.slice(0, 10)}</TableCell>
+                      <TableCell>{purchase.suppliers?.name || "Supplier not linked"}</TableCell>
+                      <TableCell>{formatCurrency(purchase.total_amount, currency)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </Card>
         ) : null}
       </section>

@@ -16,20 +16,32 @@ type CartItem = InventorySnapshotRow & {
 
 const paymentMethods: PaymentMethod[] = ["Cash", "UPI", "Card", "Split"];
 const onlinePaymentMethods: OnlinePaymentMethod[] = ["UPI", "Card"];
-const saleQuantityStep = 0.1;
 
 function roundSaleQuantity(value: number) {
-  return Number(value.toFixed(2));
+  return Number(value.toFixed(4));
 }
 
-function minimumSaleQuantity(stockQuantity: number) {
-  return stockQuantity > 0 && stockQuantity < saleQuantityStep ? roundSaleQuantity(stockQuantity) : saleQuantityStep;
+function stripStep(tabletsPerStrip: number) {
+  return roundSaleQuantity(1 / Math.max(1, tabletsPerStrip || 10));
 }
 
-function clampSaleQuantity(stockQuantity: number, value: number) {
-  const minimumQuantity = minimumSaleQuantity(stockQuantity);
+function minimumSaleQuantity(stockQuantity: number, tabletsPerStrip: number) {
+  const step = stripStep(tabletsPerStrip);
+  return stockQuantity > 0 && stockQuantity < step ? roundSaleQuantity(stockQuantity) : step;
+}
+
+function clampSaleQuantity(stockQuantity: number, tabletsPerStrip: number, value: number) {
+  const minimumQuantity = minimumSaleQuantity(stockQuantity, tabletsPerStrip);
   const nextQuantity = Number.isFinite(value) && value > 0 ? value : minimumQuantity;
   return roundSaleQuantity(Math.max(minimumQuantity, Math.min(nextQuantity, stockQuantity)));
+}
+
+function tabletCount(quantity: number, tabletsPerStrip: number) {
+  return Math.max(1, Math.round(quantity * Math.max(1, tabletsPerStrip || 10)));
+}
+
+function perTabletPrice(item: InventorySnapshotRow) {
+  return item.selling_price / Math.max(1, item.tablets_per_strip || 10);
 }
 
 export function PosForm({
@@ -101,7 +113,7 @@ export function PosForm({
           entry.batch_id === item.batch_id
             ? {
                 ...entry,
-                quantity: clampSaleQuantity(entry.stock_quantity, entry.quantity + saleQuantityStep)
+                quantity: clampSaleQuantity(entry.stock_quantity, entry.tablets_per_strip, entry.quantity + stripStep(entry.tablets_per_strip))
               }
             : entry
         );
@@ -111,7 +123,7 @@ export function PosForm({
         ...currentCart,
         {
           ...item,
-          quantity: minimumSaleQuantity(item.stock_quantity)
+          quantity: minimumSaleQuantity(item.stock_quantity, item.tablets_per_strip)
         }
       ];
     });
@@ -123,7 +135,7 @@ export function PosForm({
         entry.batch_id === batchId
           ? {
               ...entry,
-              quantity: clampSaleQuantity(entry.stock_quantity, value)
+              quantity: clampSaleQuantity(entry.stock_quantity, entry.tablets_per_strip, value)
             }
           : entry
       )
@@ -140,7 +152,7 @@ export function PosForm({
       return;
     }
 
-    updateQuantity(batchId, currentItem.quantity + saleQuantityStep);
+    updateQuantity(batchId, currentItem.quantity + stripStep(currentItem.tablets_per_strip));
   }
 
   function decrementQuantity(batchId: string) {
@@ -149,7 +161,7 @@ export function PosForm({
       return;
     }
 
-    updateQuantity(batchId, currentItem.quantity - saleQuantityStep);
+    updateQuantity(batchId, currentItem.quantity - stripStep(currentItem.tablets_per_strip));
   }
 
   function splitEvenly() {
@@ -200,8 +212,9 @@ export function PosForm({
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-slate-950">{formatCurrency(item.selling_price)}</p>
-                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{formatPreciseQuantity(item.stock_quantity)} in stock</p>
+                  <p className="text-sm font-semibold text-slate-950">{formatCurrency(perTabletPrice(item))} / tab</p>
+                  <p className="mt-1 text-xs text-slate-500">{formatCurrency(item.selling_price)} / strip</p>
+                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{formatPreciseQuantity(item.stock_quantity)} strips • {item.tablets_per_strip} tabs/strip</p>
                 </div>
               </div>
             </button>
@@ -322,7 +335,7 @@ export function PosForm({
                         <p className="truncate font-semibold text-slate-950">{item.medicine_name}</p>
                       </div>
                       <p className="mt-2 text-sm text-slate-600">
-                        Batch {item.batch_number} • Expires {item.expiry_date}
+                        Batch {item.batch_number} • Expires {item.expiry_date} • {item.tablets_per_strip} tabs/strip
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -330,15 +343,16 @@ export function PosForm({
                         <button
                           type="button"
                           onClick={() => decrementQuantity(item.batch_id)}
-                          disabled={item.quantity <= minimumSaleQuantity(item.stock_quantity)}
+                          disabled={item.quantity <= minimumSaleQuantity(item.stock_quantity, item.tablets_per_strip)}
                           className="flex h-12 w-12 items-center justify-center text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:text-slate-300"
                           aria-label={`Decrease quantity of ${item.medicine_name}`}
                         >
                           <Minus className="h-4 w-4" />
                         </button>
                         <div className="flex min-w-[4.5rem] flex-col items-center justify-center border-x border-slate-200 px-3 py-2 text-center">
-                          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Qty</span>
-                          <span className="text-lg font-semibold text-slate-950">{formatPreciseQuantity(item.quantity)}</span>
+                          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Tabs</span>
+                          <span className="text-lg font-semibold text-slate-950">{tabletCount(item.quantity, item.tablets_per_strip)}</span>
+                          <span className="text-[10px] text-slate-500">{formatPreciseQuantity(item.quantity)} strip</span>
                         </div>
                         <button
                           type="button"
@@ -353,11 +367,11 @@ export function PosForm({
                       <div className="w-28">
                         <Input
                           type="number"
-                          min={minimumSaleQuantity(item.stock_quantity)}
+                          min={minimumSaleQuantity(item.stock_quantity, item.tablets_per_strip)}
                           max={item.stock_quantity}
-                          step={saleQuantityStep}
+                          step={stripStep(item.tablets_per_strip)}
                           value={item.quantity}
-                          onChange={(event) => updateQuantity(item.batch_id, Number(event.target.value) || minimumSaleQuantity(item.stock_quantity))}
+                          onChange={(event) => updateQuantity(item.batch_id, Number(event.target.value) || minimumSaleQuantity(item.stock_quantity, item.tablets_per_strip))}
                         />
                       </div>
                       <div className="min-w-[96px] text-right text-sm font-semibold text-slate-950">

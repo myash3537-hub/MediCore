@@ -16,7 +16,7 @@ type SaleItemCandidate = {
   batch_id: string;
   medicine_id: string;
   medicines?: { name?: string | null } | null;
-  medicine_batches?: { batch_number?: string | null } | null;
+  medicine_batches?: { batch_number?: string | null; tablets_per_strip?: number | null } | null;
 };
 
 type SaleCandidate = {
@@ -46,8 +46,7 @@ export function ReturnForm({
     .filter((sale) => {
       const needle = deferredSearch.toLowerCase();
       return sale.invoice_number.toLowerCase().includes(needle) || (sale.customer_name ?? "").toLowerCase().includes(needle);
-    })
-    .slice(0, 8);
+    });
 
   const selectedSale = saleList.find((sale) => sale.id === selectedSaleId) ?? filteredSales[0];
   const selectedItems = selectedSale?.sale_items ?? [];
@@ -63,6 +62,18 @@ export function ReturnForm({
         ...patch
       }
     }));
+  }
+
+  function tabletsPerStrip(item: SaleItemCandidate) {
+    return Math.max(1, Number(item.medicine_batches?.tablets_per_strip ?? 10));
+  }
+
+  function stripStep(item: SaleItemCandidate) {
+    return Number((1 / tabletsPerStrip(item)).toFixed(4));
+  }
+
+  function soldTabletCount(item: SaleItemCandidate) {
+    return Math.round(item.quantity * tabletsPerStrip(item));
   }
 
   return (
@@ -134,11 +145,11 @@ export function ReturnForm({
                     <div>
                       <p className="font-semibold text-slate-950">{item.medicines?.name ?? "Medicine"}</p>
                       <p className="mt-2 text-sm text-slate-600">
-                        Batch {item.medicine_batches?.batch_number ?? "N/A"} • Sold qty {formatPreciseQuantity(item.quantity)}
+                        Batch {item.medicine_batches?.batch_number ?? "N/A"} • Sold {soldTabletCount(item)} tab{soldTabletCount(item) === 1 ? "" : "s"} ({formatPreciseQuantity(item.quantity)} strip)
                       </p>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <Input type="number" min={0} max={item.quantity} step="0.01" value={itemsState[item.id]?.quantity ?? 0} onChange={(event) => updateItem(item.id, { quantity: Number(event.target.value) || 0 })} />
+                      <Input type="number" min={0} max={item.quantity} step={stripStep(item)} value={itemsState[item.id]?.quantity ?? 0} onChange={(event) => updateItem(item.id, { quantity: Number(event.target.value) || 0 })} />
                       <Input
                         type="number"
                         min={0}

@@ -40,65 +40,69 @@ export default async function DashboardPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <Card>
+        <Card className="overflow-hidden">
           <CardHeader title="Low stock items" description="Items already at or below their configured minimum threshold." action={<Link href="/inventory" className="text-sm font-semibold text-brand-700">Open inventory</Link>} />
           {data.lowStockItems.length ? (
-            <Table>
-              <TableHead>
-                <tr>
-                  <TableHeaderCell>Medicine</TableHeaderCell>
-                  <TableHeaderCell>Batch</TableHeaderCell>
-                  <TableHeaderCell>Available</TableHeaderCell>
-                  <TableHeaderCell>Status</TableHeaderCell>
-                </tr>
-              </TableHead>
-              <TableBody>
-                {data.lowStockItems.map((item) => (
-                  <TableRow key={item.batch_id}>
-                    <TableCell>
-                      <p className="font-semibold text-slate-950">{item.medicine_name}</p>
-                      <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{item.category}</p>
-                    </TableCell>
-                    <TableCell>{item.batch_number}</TableCell>
-                    <TableCell>{formatQuantity(item.stock_quantity)}</TableCell>
-                    <TableCell>
-                      <Badge variant="danger">Low stock</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="scrollbar-thin max-h-[32rem] overflow-y-auto pr-2">
+              <Table>
+                <TableHead>
+                  <tr>
+                    <TableHeaderCell>Medicine</TableHeaderCell>
+                    <TableHeaderCell>Batch</TableHeaderCell>
+                    <TableHeaderCell>Available</TableHeaderCell>
+                    <TableHeaderCell>Status</TableHeaderCell>
+                  </tr>
+                </TableHead>
+                <TableBody>
+                  {data.lowStockItems.map((item) => (
+                    <TableRow key={item.batch_id}>
+                      <TableCell>
+                        <p className="font-semibold text-slate-950">{item.medicine_name}</p>
+                        <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{item.category}</p>
+                      </TableCell>
+                      <TableCell>{item.batch_number}</TableCell>
+                      <TableCell>{formatQuantity(item.stock_quantity)}</TableCell>
+                      <TableCell>
+                        <Badge variant="danger">Low stock</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
             <EmptyState icon={PackageSearch} title="Inventory is healthy" description="Nothing has crossed the low stock threshold right now." />
           )}
         </Card>
 
-        <Card>
+        <Card className="overflow-hidden">
           <CardHeader title="Expiry alerts" description="Batches expiring within the configured alert window." action={<Link href="/reports" className="text-sm font-semibold text-brand-700">Expiry report</Link>} />
           {data.expiringItems.length ? (
-            <Table>
-              <TableHead>
-                <tr>
-                  <TableHeaderCell>Medicine</TableHeaderCell>
-                  <TableHeaderCell>Expiry</TableHeaderCell>
-                  <TableHeaderCell>Stock</TableHeaderCell>
-                  <TableHeaderCell>Prescription</TableHeaderCell>
-                </tr>
-              </TableHead>
-              <TableBody>
-                {data.expiringItems.map((item) => (
-                  <TableRow key={item.batch_id}>
-                    <TableCell>
-                      <p className="font-semibold text-slate-950">{item.medicine_name}</p>
-                      <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Batch {item.batch_number}</p>
-                    </TableCell>
-                    <TableCell>{item.expiry_date}</TableCell>
-                    <TableCell>{formatQuantity(item.stock_quantity)}</TableCell>
-                    <TableCell>{item.rx_required ? <Badge variant="warning">Rx</Badge> : <Badge variant="success">OTC</Badge>}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="scrollbar-thin max-h-[32rem] overflow-y-auto pr-2">
+              <Table>
+                <TableHead>
+                  <tr>
+                    <TableHeaderCell>Medicine</TableHeaderCell>
+                    <TableHeaderCell>Expiry</TableHeaderCell>
+                    <TableHeaderCell>Stock</TableHeaderCell>
+                    <TableHeaderCell>Prescription</TableHeaderCell>
+                  </tr>
+                </TableHead>
+                <TableBody>
+                  {data.expiringItems.map((item) => (
+                    <TableRow key={item.batch_id}>
+                      <TableCell>
+                        <p className="font-semibold text-slate-950">{item.medicine_name}</p>
+                        <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Batch {item.batch_number}</p>
+                      </TableCell>
+                      <TableCell>{item.expiry_date}</TableCell>
+                      <TableCell>{formatQuantity(item.stock_quantity)}</TableCell>
+                      <TableCell>{item.rx_required ? <Badge variant="warning">Rx</Badge> : <Badge variant="success">OTC</Badge>}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
             <EmptyState icon={ShieldCheck} title="No urgent expiries" description="The active stock is currently outside the expiry alert threshold." />
           )}

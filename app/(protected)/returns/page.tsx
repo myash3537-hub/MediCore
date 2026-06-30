@@ -45,30 +45,40 @@ export default async function ReturnsPage({
 
       <ReturnForm sales={data.saleCandidates} />
 
-      <Card>
-        <CardHeader title="Recent sales returns" description="Track refunded invoices and stock restoration history." action={<Badge variant="warning">{data.recentReturns.length} recent returns</Badge>} />
-        <Table>
-          <TableHead>
-            <tr>
-              <TableHeaderCell>Invoice</TableHeaderCell>
-              <TableHeaderCell>Customer</TableHeaderCell>
-              <TableHeaderCell>Return date</TableHeaderCell>
-              <TableHeaderCell>Reason</TableHeaderCell>
-              <TableHeaderCell>Refund</TableHeaderCell>
-            </tr>
-          </TableHead>
-          <TableBody>
-            {data.recentReturns.map((entry) => (
-              <TableRow key={String(entry.id)}>
-                <TableCell>{String((entry.sales as { invoice_number?: string } | null)?.invoice_number ?? "N/A")}</TableCell>
-                <TableCell>{String((entry.sales as { customer_name?: string } | null)?.customer_name ?? "Walk-in customer")}</TableCell>
-                <TableCell>{String(entry.return_date).slice(0, 10)}</TableCell>
-                <TableCell>{String(entry.reason ?? "No reason captured")}</TableCell>
-                <TableCell>{formatCurrency(Number(entry.refund_amount ?? 0), currency)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <Card className="overflow-hidden">
+        <CardHeader title="All sales returns" description="Complete refunded invoice and stock restoration history." action={<Badge variant="warning">{data.recentReturns.length} returns</Badge>} />
+        <div className="scrollbar-thin max-h-[32rem] overflow-y-auto pr-2">
+          <Table>
+            <TableHead>
+              <tr>
+                <TableHeaderCell>Invoice</TableHeaderCell>
+                <TableHeaderCell>Customer</TableHeaderCell>
+                <TableHeaderCell>Return date</TableHeaderCell>
+                <TableHeaderCell>Reason</TableHeaderCell>
+                <TableHeaderCell>Refund</TableHeaderCell>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {data.recentReturns.length ? (
+                data.recentReturns.map((entry) => (
+                  <TableRow key={String(entry.id)}>
+                    <TableCell>{String((entry.sales as { invoice_number?: string } | null)?.invoice_number ?? "N/A")}</TableCell>
+                    <TableCell>{String((entry.sales as { customer_name?: string } | null)?.customer_name ?? "Walk-in customer")}</TableCell>
+                    <TableCell>{String(entry.return_date).slice(0, 10)}</TableCell>
+                    <TableCell>{String(entry.reason ?? "No reason captured")}</TableCell>
+                    <TableCell>{formatCurrency(Number(entry.refund_amount ?? 0), currency)}</TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-sm text-slate-500">
+                    No returns have been recorded yet.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
 
       {data.profile.role === "admin" ? (

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, Archive, Boxes, CircleAlert, CircleCheckBig, Info, PencilLine, Search, Sparkles } from "lucide-react";
 
-import { archiveMedicineAction } from "@/lib/actions/pharmacy";
+import { archiveMedicineAction, deleteBatchAction } from "@/lib/actions/pharmacy";
 import { MedicineForm } from "@/components/forms/medicine-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -215,7 +215,8 @@ export default async function InventoryPage({
                         <p className="mt-1 text-xs text-slate-500">{batch.supplier_name || "No supplier linked"}</p>
                         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                           <span>Expires {batch.expiry_date}</span>
-                          <span>{formatQuantity(batch.stock_quantity)} in stock</span>
+                          <span>{formatQuantity(batch.stock_quantity)} strips in stock</span>
+                          <span>{batch.tablets_per_strip} tabs/strip</span>
                         </div>
                       </div>
                     ))}
@@ -261,9 +262,22 @@ export default async function InventoryPage({
                                 stock_quantity: batch.stock_quantity,
                                 purchase_price: canManagePurchasePrice ? batch.purchase_price : undefined,
                                 selling_price: batch.selling_price,
+                                tablets_per_strip: batch.tablets_per_strip,
                                 low_stock_threshold: batch.low_stock_threshold
                               }}
                             />
+                            {canManagePurchasePrice ? (
+                              <form action={deleteBatchAction} className="mt-4 border-t border-slate-200 pt-4">
+                                <input type="hidden" name="batch_id" value={batch.batch_id} />
+                                <Button type="submit" variant="secondary" className="w-full justify-start border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100">
+                                  <Archive className="h-4 w-4" />
+                                  Delete this batch
+                                </Button>
+                                <p className="mt-2 text-xs leading-5 text-slate-500">
+                                  Delete only works for batches that are not linked to sales, purchases, or returns.
+                                </p>
+                              </form>
+                            ) : null}
                           </div>
                         </details>
                       ))}
