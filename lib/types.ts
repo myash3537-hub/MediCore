@@ -44,6 +44,7 @@ export type InventorySnapshotRow = {
   selling_price: number;
   tablets_per_strip: number;
   low_stock_threshold: number;
+  low_stock_alert_enabled: boolean;
   supplier_name?: string | null;
   is_low_stock: boolean;
 };

@@ -83,8 +83,9 @@ export async function getInventorySnapshot() {
     stock_quantity: toNumber(row.stock_quantity),
     purchase_price: toNumber(row.purchase_price),
     selling_price: toNumber(row.selling_price),
-    tablets_per_strip: Math.max(1, Math.round(toNumber(row.tablets_per_strip || 10))),
-    low_stock_threshold: toNumber(row.low_stock_threshold)
+    tablets_per_strip: row.category === "Tablet" ? Math.max(1, Math.round(toNumber(row.tablets_per_strip || 10))) : 1,
+    low_stock_threshold: toNumber(row.low_stock_threshold),
+    low_stock_alert_enabled: row.low_stock_alert_enabled ?? true
   }));
 }
 
@@ -161,8 +162,27 @@ export async function getDashboardData() {
     online_payment_method: (sale.online_payment_method as OnlinePaymentMethod | null | undefined) ?? null
   }));
 
-  const lowStockItems = inventoryRows
-    .filter((item) => item.stock_quantity <= item.low_stock_threshold)
+  const lowStockItems = Array.from(
+    inventoryRows
+      .reduce((groups, row) => {
+        const existing = groups.get(row.medicine_id);
+
+        if (existing) {
+          existing.stock_quantity += row.stock_quantity;
+          existing.low_stock_threshold = Math.max(existing.low_stock_threshold, row.low_stock_threshold);
+          existing.batch_number = `${Number(existing.batch_number.split(" ")[0]) + 1} batches`;
+          return groups;
+        }
+
+        groups.set(row.medicine_id, {
+          ...row,
+          batch_number: "1 batch"
+        });
+        return groups;
+      }, new Map<string, InventorySnapshotRow>())
+      .values()
+  )
+    .filter((item) => item.low_stock_alert_enabled && item.stock_quantity <= item.low_stock_threshold)
     .sort((a, b) => a.stock_quantity - b.stock_quantity);
   const expiryAlertDate = new Date();
   expiryAlertDate.setDate(expiryAlertDate.getDate() + (settings?.expiry_alert_days ?? 45));

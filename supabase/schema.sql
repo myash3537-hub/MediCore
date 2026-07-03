@@ -139,6 +139,7 @@ $$;
 );
 
 create unique index if not exists medicines_name_unique on public.medicines (lower(name));
+alter table public.medicines add column if not exists low_stock_alert_enabled boolean not null default true;
 
 create table if not exists public.medicine_batches (
   id uuid primary key default gen_random_uuid(),
@@ -379,6 +380,7 @@ select
   m.name as medicine_name,
   m.category,
   m.rx_required,
+  m.low_stock_alert_enabled,
   b.batch_number,
   b.expiry_date,
   b.stock_quantity,
@@ -387,7 +389,7 @@ select
   b.tablets_per_strip,
   b.low_stock_threshold,
   s.name as supplier_name,
-  (b.stock_quantity <= b.low_stock_threshold) as is_low_stock
+  (m.low_stock_alert_enabled and b.stock_quantity <= b.low_stock_threshold) as is_low_stock
 from public.medicine_batches b
 join public.medicines m on m.id = b.medicine_id
 left join public.suppliers s on s.id = b.supplier_id

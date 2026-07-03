@@ -191,6 +191,7 @@ export async function upsertMedicineAction(formData: FormData) {
     category: asString(formData.get("category")),
     default_supplier_id: supplierId,
     rx_required: asBoolean(formData.get("rx_required")),
+    low_stock_alert_enabled: asBoolean(formData.get("low_stock_alert_enabled")),
     description: asString(formData.get("description")) || null,
     sku: asString(formData.get("sku")) || null,
     is_active: true
@@ -227,7 +228,8 @@ export async function upsertMedicineAction(formData: FormData) {
     const stockQuantity = asNumber(formData.get("stock_quantity"));
     const submittedPurchasePrice = asNumber(formData.get("purchase_price"));
     const sellingPrice = asNumber(formData.get("selling_price"));
-    const tabletsPerStrip = Math.max(1, Math.round(asNumber(formData.get("tablets_per_strip")) || 10));
+    const medicineCategory = asString(formData.get("category"));
+    const tabletsPerStrip = medicineCategory === "Tablet" ? Math.max(1, Math.round(asNumber(formData.get("tablets_per_strip")) || 10)) : 1;
     const lowStockThreshold = asNumber(formData.get("low_stock_threshold")) || 10;
     let existingBatchRecord: { id: string; stock_quantity: number; purchase_price: number } | null = null;
 

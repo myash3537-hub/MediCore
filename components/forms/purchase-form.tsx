@@ -67,7 +67,7 @@ export function PurchaseForm({
           quantity: 1,
           purchase_price: 0,
           selling_price: 0,
-          tablets_per_strip: 10,
+          tablets_per_strip: medicine.category === "Tablet" ? 10 : 1,
           low_stock_threshold: defaultLowStockThreshold
         }
       ];
@@ -135,7 +135,7 @@ export function PurchaseForm({
                 quantity: row.quantity,
                 purchase_price: row.purchase_price,
                 selling_price: row.selling_price,
-                tablets_per_strip: row.tablets_per_strip,
+                tablets_per_strip: row.category === "Tablet" ? row.tablets_per_strip : 1,
                 low_stock_threshold: row.low_stock_threshold
               }))
             )}
@@ -196,7 +196,9 @@ export function PurchaseForm({
                     <Input type="number" min={0.01} step="0.01" value={row.quantity} onChange={(event) => updateRow(row.id, { quantity: Number(event.target.value) || 1 })} />
                     <Input type="number" min={0} step="0.01" value={row.purchase_price} onChange={(event) => updateRow(row.id, { purchase_price: Number(event.target.value) || 0 })} />
                     <Input type="number" min={0} step="0.01" value={row.selling_price} onChange={(event) => updateRow(row.id, { selling_price: Number(event.target.value) || 0 })} />
-                    <Input type="number" min={1} step={1} value={row.tablets_per_strip} onChange={(event) => updateRow(row.id, { tablets_per_strip: Math.max(1, Math.round(Number(event.target.value) || 10)) })} />
+                    {row.category === "Tablet" ? (
+                      <Input type="number" min={1} step={1} value={row.tablets_per_strip} onChange={(event) => updateRow(row.id, { tablets_per_strip: Math.max(1, Math.round(Number(event.target.value) || 10)) })} />
+                    ) : null}
                     <Input type="number" min={0} value={row.low_stock_threshold} onChange={(event) => updateRow(row.id, { low_stock_threshold: Number(event.target.value) || defaultLowStockThreshold })} />
                   </div>
                 </div>

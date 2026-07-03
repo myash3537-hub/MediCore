@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 import { upsertMedicineAction } from "@/lib/actions/pharmacy";
 import { medicineCategories } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
@@ -19,6 +23,7 @@ type MedicineFormValues = {
   selling_price?: number;
   tablets_per_strip?: number;
   low_stock_threshold?: number;
+  low_stock_alert_enabled?: boolean;
   sku?: string | null;
   description?: string | null;
 };
@@ -34,6 +39,9 @@ export function MedicineForm({
   actionLabel: string;
   canManagePurchasePrice: boolean;
 }>) {
+  const [category, setCategory] = useState(initial?.category ?? medicineCategories[0]);
+  const isTablet = category === "Tablet";
+
   return (
     <form action={upsertMedicineAction} className="grid gap-4">
       <input type="hidden" name="medicine_id" defaultValue={initial?.medicine_id ?? ""} />
@@ -46,7 +54,7 @@ export function MedicineForm({
         </div>
         <div className="space-y-2">
           <label className="text-sm font-semibold text-slate-800">Category</label>
-          <Select name="category" defaultValue={initial?.category ?? medicineCategories[0]}>
+          <Select name="category" value={category} onChange={(event) => setCategory(event.target.value)}>
             {medicineCategories.map((category) => (
               <option key={category} value={category}>
                 {category}
@@ -84,17 +92,30 @@ export function MedicineForm({
           <Input name="expiry_date" type="date" defaultValue={initial?.expiry_date ?? ""} />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-800">Stock quantity (strips)</label>
+          <label className="text-sm font-semibold text-slate-800">{isTablet ? "Stock quantity (strips)" : "Stock quantity"}</label>
           <Input name="stock_quantity" type="number" min={0} step="0.01" defaultValue={initial?.stock_quantity ?? 0} />
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-800">Tablets per strip</label>
-          <Input name="tablets_per_strip" type="number" min={1} step={1} defaultValue={initial?.tablets_per_strip ?? 10} />
-        </div>
+        {isTablet ? (
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-800">Tablets per strip</label>
+            <Input name="tablets_per_strip" type="number" min={1} step={1} defaultValue={initial?.tablets_per_strip ?? 10} />
+          </div>
+        ) : (
+          <input type="hidden" name="tablets_per_strip" value={1} />
+        )}
         <div className="space-y-2">
           <label className="text-sm font-semibold text-slate-800">Low stock alert</label>
           <Input name="low_stock_threshold" type="number" min={0} defaultValue={initial?.low_stock_threshold ?? 10} />
         </div>
+        <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">
+          <input
+            type="checkbox"
+            name="low_stock_alert_enabled"
+            defaultChecked={initial?.low_stock_alert_enabled ?? true}
+            className="h-4 w-4 rounded border-slate-300 text-brand-600"
+          />
+          Show low stock alert for this medicine
+        </label>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

@@ -44,6 +44,10 @@ function perTabletPrice(item: InventorySnapshotRow) {
   return item.selling_price / Math.max(1, item.tablets_per_strip || 10);
 }
 
+function isTablet(item: InventorySnapshotRow) {
+  return item.category === "Tablet";
+}
+
 function toMoney(value: number) {
   return Number(value.toFixed(2));
 }
@@ -236,9 +240,11 @@ export function PosForm({
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-slate-950">{formatCurrency(perTabletPrice(item))} / tab</p>
-                  <p className="mt-1 text-xs text-slate-500">{formatCurrency(item.selling_price)} / strip</p>
-                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{formatPreciseQuantity(item.stock_quantity)} strips • {item.tablets_per_strip} tabs/strip</p>
+                  <p className="text-sm font-semibold text-slate-950">{formatCurrency(isTablet(item) ? perTabletPrice(item) : item.selling_price)} / {isTablet(item) ? "tab" : "unit"}</p>
+                  {isTablet(item) ? <p className="mt-1 text-xs text-slate-500">{formatCurrency(item.selling_price)} / strip</p> : null}
+                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
+                    {formatPreciseQuantity(item.stock_quantity)} {isTablet(item) ? `strips • ${item.tablets_per_strip} tabs/strip` : "units"}
+                  </p>
                 </div>
               </div>
             </button>
@@ -359,7 +365,7 @@ export function PosForm({
                         <p className="truncate font-semibold text-slate-950">{item.medicine_name}</p>
                       </div>
                       <p className="mt-2 text-sm text-slate-600">
-                        Batch {item.batch_number} • Expires {item.expiry_date} • {item.tablets_per_strip} tabs/strip
+                        Batch {item.batch_number} • Expires {item.expiry_date}{isTablet(item) ? ` • ${item.tablets_per_strip} tabs/strip` : ""}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">

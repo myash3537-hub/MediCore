@@ -20,6 +20,8 @@ type InventoryGroup = {
   rx_required: boolean;
   total_stock_quantity: number;
   low_stock_batches: number;
+  low_stock_threshold: number;
+  low_stock_alert_enabled: boolean;
   batches: InventorySnapshotRow[];
 };
 
@@ -45,7 +47,8 @@ function groupInventoryRows(rows: InventorySnapshotRow[]) {
 
     if (existing) {
       existing.total_stock_quantity += row.stock_quantity;
-      existing.low_stock_batches += row.is_low_stock ? 1 : 0;
+      existing.low_stock_threshold = Math.max(existing.low_stock_threshold, row.low_stock_threshold);
+      existing.low_stock_alert_enabled = existing.low_stock_alert_enabled || row.low_stock_alert_enabled;
       existing.batches.push(row);
       return;
     }
@@ -56,12 +59,17 @@ function groupInventoryRows(rows: InventorySnapshotRow[]) {
       category: row.category,
       rx_required: row.rx_required,
       total_stock_quantity: row.stock_quantity,
-      low_stock_batches: row.is_low_stock ? 1 : 0,
+      low_stock_batches: 0,
+      low_stock_threshold: row.low_stock_threshold,
+      low_stock_alert_enabled: row.low_stock_alert_enabled,
       batches: [row]
     });
   });
 
-  return Array.from(groups.values());
+  return Array.from(groups.values()).map((group) => ({
+    ...group,
+    low_stock_batches: group.low_stock_alert_enabled && group.total_stock_quantity <= group.low_stock_threshold ? 1 : 0
+  }));
 }
 
 function filterInventoryGroups(groups: InventoryGroup[], query: string) {
@@ -232,7 +240,7 @@ export default async function InventoryPage({
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-2">
-                    {group.low_stock_batches ? <Badge variant="danger">{group.low_stock_batches} low stock</Badge> : <Badge variant="success">Healthy</Badge>}
+                    {group.low_stock_batches ? <Badge variant="danger">Low stock</Badge> : <Badge variant="success">Healthy</Badge>}
                     <Badge variant="accent">Batch-managed</Badge>
                   </div>
                 </TableCell>
@@ -263,7 +271,8 @@ export default async function InventoryPage({
                                 purchase_price: canManagePurchasePrice ? batch.purchase_price : undefined,
                                 selling_price: batch.selling_price,
                                 tablets_per_strip: batch.tablets_per_strip,
-                                low_stock_threshold: batch.low_stock_threshold
+                                low_stock_threshold: batch.low_stock_threshold,
+                                low_stock_alert_enabled: batch.low_stock_alert_enabled
                               }}
                             />
                             {canManagePurchasePrice ? (
