@@ -50,7 +50,7 @@ export default async function LoginPage({
             {[
               { label: "Inventory traceability", value: "Batch-wise stock and expiry control" },
               { label: "Billing flow", value: "Search-driven POS with flexible payments" },
-              { label: "Admin oversight", value: "Role access, audit trail, and alerts" }
+              { label: "Admin oversight", value: "Role access, controls, and alerts" }
             ].map((item) => (
               <div key={item.label} className="rounded-3xl border border-white/10 bg-white/5 p-5">
                 <p className="text-xs uppercase tracking-[0.22em] text-slate-400">{item.label}</p>

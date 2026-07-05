@@ -149,21 +149,13 @@ async function resolveSupplierId({
 }
 
 async function recordAuditForUser(
-  userId: string | null,
-  entityName: string,
-  entityId: string,
-  action: string,
-  details: Record<string, unknown>
+  _userId: string | null,
+  _entityName: string,
+  _entityId: string,
+  _action: string,
+  _details: Record<string, unknown>
 ) {
-  const supabase = createAdminClient();
-
-  await supabase.from("audit_logs").insert({
-    user_id: userId,
-    entity_name: entityName,
-    entity_id: entityId || null,
-    action,
-    details
-  });
+  return;
 }
 
 export async function upsertMedicineAction(formData: FormData) {

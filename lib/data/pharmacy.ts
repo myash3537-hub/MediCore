@@ -2,7 +2,7 @@ import { format, parseISO, startOfDay, startOfMonth, subDays } from "date-fns";
 
 import { requireAuthenticated, requireRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { AuditLog, ChartDatum, InventorySnapshotRow, OnlinePaymentMethod, PaymentMethod, Profile, PurchaseSummary, SaleSummary, StoreSettings, Supplier } from "@/lib/types";
+import { ChartDatum, InventorySnapshotRow, OnlinePaymentMethod, PaymentMethod, Profile, PurchaseSummary, SaleSummary, StoreSettings, Supplier } from "@/lib/types";
 import { normalizeStoreName } from "@/lib/utils";
 
 const PAGE_SIZE = 1000;
@@ -121,7 +121,7 @@ export async function getDashboardData() {
   const today = startOfDay(new Date());
   const monthStart = startOfMonth(new Date());
 
-  const [settings, inventoryRows, salesRows, monthSalesRows, recentSalesRows, notifications, auditLogRows] = await Promise.all([
+  const [settings, inventoryRows, salesRows, monthSalesRows, recentSalesRows, notifications] = await Promise.all([
     getStoreSettings(),
     getInventorySnapshot(),
     supabase
@@ -135,14 +135,7 @@ export async function getDashboardData() {
       .select("id, invoice_number, sale_date, customer_name, subtotal, discount_amount, tax_amount, total_amount, payment_method, cash_amount, online_amount, online_payment_method")
       .order("sale_date", { ascending: false })
       .limit(6),
-    getNotifications(profile.role),
-    profile.role === "admin"
-      ? supabase
-          .from("audit_logs")
-          .select("id, entity_name, entity_id, action, details, created_at, profiles(full_name, email)")
-          .order("created_at", { ascending: false })
-          .limit(10)
-      : Promise.resolve({ data: [] })
+    getNotifications(profile.role)
   ]);
 
   const trendRows = ((salesRows.data as Array<Record<string, unknown>> | null) ?? []).map((row) => ({
@@ -230,7 +223,7 @@ export async function getDashboardData() {
     expiringItems,
     recentSales,
     notifications,
-    auditLogs: (auditLogRows.data as AuditLog[] | null) ?? []
+    auditLogs: []
   };
 }
 
@@ -386,17 +379,10 @@ export async function getReportsData() {
 export async function getUsersData() {
   await requireRole("admin");
   const supabase = createAdminClient();
-  const [profiles, auditLogs] = await Promise.all([
-    supabase.from("profiles").select("id, email, full_name, role, permissions, is_active, created_at, last_seen_at").order("created_at"),
-    supabase
-      .from("audit_logs")
-      .select("id, entity_name, entity_id, action, details, created_at, profiles(full_name, email)")
-      .order("created_at", { ascending: false })
-      .limit(20)
-  ]);
+  const profiles = await supabase.from("profiles").select("id, email, full_name, role, permissions, is_active, created_at, last_seen_at").order("created_at");
 
   return {
     profiles: (profiles.data as Profile[] | null) ?? [],
-    auditLogs: (auditLogs.data as AuditLog[] | null) ?? []
+    auditLogs: []
   };
 }

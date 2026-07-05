@@ -84,29 +84,6 @@ export default async function UsersPage({
         </Table>
       </Card>
 
-      <Card>
-        <CardHeader title="Recent user activity" description="Monitor operational actions performed by staff." />
-        <Table>
-          <TableHead>
-            <tr>
-              <TableHeaderCell>Entity</TableHeaderCell>
-              <TableHeaderCell>Action</TableHeaderCell>
-              <TableHeaderCell>User</TableHeaderCell>
-              <TableHeaderCell>Time</TableHeaderCell>
-            </tr>
-          </TableHead>
-          <TableBody>
-            {data.auditLogs.map((entry) => (
-              <TableRow key={entry.id}>
-                <TableCell>{entry.entity_name}</TableCell>
-                <TableCell>{entry.action}</TableCell>
-                <TableCell>{entry.profiles?.full_name || entry.profiles?.email || "System"}</TableCell>
-                <TableCell>{entry.created_at.slice(0, 16).replace("T", " ")}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Card>
     </div>
   );
 }

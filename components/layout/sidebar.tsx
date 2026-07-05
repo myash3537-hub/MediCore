@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, ClipboardList, FileText, LayoutDashboard, Package2, Receipt, Settings, ShoppingCart, Users } from "lucide-react";
+import { ClipboardList, FileText, LayoutDashboard, Package2, Receipt, Settings, ShoppingCart, Users } from "lucide-react";
 
 import { signOutAction } from "@/lib/actions/auth";
 import { navItems } from "@/lib/constants";
@@ -10,7 +10,6 @@ import { Profile } from "@/lib/types";
 import { cn, initialsFromName } from "@/lib/utils";
 
 const iconMap = {
-  Activity,
   ClipboardList,
   FileText,
   LayoutDashboard,
@@ -83,7 +82,7 @@ export function Sidebar({ profile }: Readonly<{ profile: Profile }>) {
             </div>
           </div>
           <p className="mt-4 hidden text-xs leading-5 text-slate-300 2xl:block">
-            Everything important stays one click away: stock alerts, sales, supplier receipts, and compliance-ready audit records.
+            Everything important stays one click away: stock alerts, sales, supplier receipts, and daily operational actions.
           </p>
           <form action={signOutAction} className="mt-4">
             <button type="submit" className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/16">

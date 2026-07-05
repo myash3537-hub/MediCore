@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BellRing, ClipboardList, PackageSearch, ShieldCheck, TrendingUp } from "lucide-react";
+import { BellRing, ClipboardList, PackageSearch, ShieldCheck } from "lucide-react";
 
 import { BarChart } from "@/components/charts/bar-chart";
 import { LineChart } from "@/components/charts/line-chart";
@@ -160,31 +160,6 @@ export default async function DashboardPage() {
         </Card>
       </section>
 
-      {data.profile.role === "admin" ? (
-        <Card className="scroll-mt-24" id="activity">
-          <CardHeader title="Recent activity log" description="Admin view of operational changes across the system." action={<TrendingUp className="h-5 w-5 text-brand-700" />} />
-          <Table>
-            <TableHead>
-              <tr>
-                <TableHeaderCell>Entity</TableHeaderCell>
-                <TableHeaderCell>Action</TableHeaderCell>
-                <TableHeaderCell>User</TableHeaderCell>
-                <TableHeaderCell>Time</TableHeaderCell>
-              </tr>
-            </TableHead>
-            <TableBody>
-              {data.auditLogs.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell>{entry.entity_name}</TableCell>
-                  <TableCell>{entry.action}</TableCell>
-                  <TableCell>{entry.profiles?.full_name || entry.profiles?.email || "System"}</TableCell>
-                  <TableCell>{entry.created_at.slice(0, 16).replace("T", " ")}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
-      ) : null}
     </div>
   );
 }

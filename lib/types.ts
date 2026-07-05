@@ -5,7 +5,7 @@ export type OnlinePaymentMethod = "UPI" | "Card";
 export type NavigationItem = {
   title: string;
   href: string;
-  icon: "LayoutDashboard" | "Package2" | "ShoppingCart" | "Receipt" | "ClipboardList" | "FileText" | "Users" | "Settings" | "Activity";
+  icon: "LayoutDashboard" | "Package2" | "ShoppingCart" | "Receipt" | "ClipboardList" | "FileText" | "Users" | "Settings";
   roles?: UserRole[];
   featured?: boolean;
 };

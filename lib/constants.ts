@@ -8,8 +8,7 @@ export const navItems: NavigationItem[] = [
   { title: "Returns", href: "/returns", icon: "ClipboardList" },
   { title: "Reports", href: "/reports", icon: "FileText" },
   { title: "Users", href: "/users", icon: "Users", roles: ["admin"] },
-  { title: "Settings", href: "/settings", icon: "Settings", roles: ["admin"] },
-  { title: "Activity", href: "/dashboard#activity", icon: "Activity", roles: ["admin"] }
+  { title: "Settings", href: "/settings", icon: "Settings", roles: ["admin"] }
 ];
 
 export const medicineCategories = [
