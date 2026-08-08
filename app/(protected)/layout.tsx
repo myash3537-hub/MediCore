@@ -11,14 +11,14 @@ export default async function ProtectedLayout({
 }>) {
   const session = await getSessionContext();
 
-  if (!session.profile) {
+  if (!session.profile || !session.branch) {
     redirect("/login");
   }
 
   return (
     <>
       <RealtimeRefresh />
-      <AppShell profile={session.profile}>{children}</AppShell>
+      <AppShell profile={session.profile} branch={session.branch}>{children}</AppShell>
     </>
   );
 }

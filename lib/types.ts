@@ -21,6 +21,14 @@ export type Profile = {
   last_seen_at?: string | null;
 };
 
+export type Branch = {
+  id: string;
+  name: string;
+  code: string;
+  is_active: boolean;
+  created_at?: string | null;
+};
+
 export type Supplier = {
   id: string;
   name: string;
@@ -35,6 +43,7 @@ export type InventorySnapshotRow = {
   batch_id: string;
   medicine_id: string;
   medicine_name: string;
+  generic_name?: string | null;
   category: string;
   rx_required: boolean;
   batch_number: string;
@@ -70,6 +79,7 @@ export type SaleSummary = {
   discount_amount: number;
   tax_amount: number;
   total_amount: number;
+  due_amount?: number;
   payment_method: PaymentMethod;
   cash_amount?: number;
   online_amount?: number;

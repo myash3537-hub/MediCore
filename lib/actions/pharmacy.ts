@@ -118,10 +118,12 @@ function resolvePaymentBreakdown({
 
 async function resolveSupplierId({
   supplierId,
-  supplierName
+  supplierName,
+  branchId
 }: {
   supplierId: string;
   supplierName: string;
+  branchId: string;
 }) {
   if (supplierId) {
     return supplierId;
@@ -137,9 +139,11 @@ async function resolveSupplierId({
     .upsert(
       {
         name: supplierName
+        ,
+        branch_id: branchId
       },
       {
-        onConflict: "name"
+        onConflict: "branch_id,name"
       }
     )
     .select("id")
@@ -159,7 +163,7 @@ async function recordAuditForUser(
 }
 
 export async function upsertMedicineAction(formData: FormData) {
-  const { profile } = await requireAuthenticated();
+  const { profile, branch } = await requireAuthenticated();
   const supabase = createAdminClient();
   const canManagePurchasePrice = profile?.role === "admin";
 
@@ -175,11 +179,14 @@ export async function upsertMedicineAction(formData: FormData) {
 
   const supplierId = await resolveSupplierId({
     supplierId: asString(formData.get("supplier_id")),
-    supplierName: asString(formData.get("supplier_name"))
+    supplierName: asString(formData.get("supplier_name")),
+    branchId: branch.id
   });
 
   const medicinePayload = {
+    branch_id: branch.id,
     name: medicineName,
+    generic_name: asString(formData.get("generic_name")) || null,
     category: asString(formData.get("category")),
     default_supplier_id: supplierId,
     rx_required: asBoolean(formData.get("rx_required")),
@@ -191,7 +198,7 @@ export async function upsertMedicineAction(formData: FormData) {
 
   let resolvedMedicineId = medicineId;
   if (!resolvedMedicineId && medicineName) {
-    const { data: existingMedicine } = await supabase.from("medicines").select("id").ilike("name", medicineName).maybeSingle();
+    const { data: existingMedicine } = await supabase.from("medicines").select("id").eq("branch_id", branch.id).ilike("name", medicineName).maybeSingle();
     resolvedMedicineId = (existingMedicine as { id: string } | null)?.id ?? "";
   }
 
@@ -230,6 +237,7 @@ export async function upsertMedicineAction(formData: FormData) {
         .from("medicine_batches")
         .select("id, stock_quantity, purchase_price")
         .eq("id", batchId)
+        .eq("branch_id", branch.id)
         .maybeSingle();
 
       existingBatchRecord = (existingBatch as { id: string; stock_quantity: number; purchase_price: number } | null) ?? null;
@@ -237,6 +245,7 @@ export async function upsertMedicineAction(formData: FormData) {
       const { data: existingBatch } = await supabase
         .from("medicine_batches")
         .select("id, stock_quantity, purchase_price")
+        .eq("branch_id", branch.id)
         .eq("medicine_id", savedMedicineId)
         .eq("batch_number", batchNumber)
         .maybeSingle();
@@ -255,6 +264,7 @@ export async function upsertMedicineAction(formData: FormData) {
     const effectivePurchasePrice = canManagePurchasePrice ? submittedPurchasePrice : Number(existingBatchRecord?.purchase_price ?? 0);
     const effectiveBatchId = batchId || existingBatchRecord?.id || "";
     const batchPayload = {
+      branch_id: branch.id,
       medicine_id: savedMedicineId,
       supplier_id: supplierId,
       batch_number: batchNumber,
@@ -285,6 +295,7 @@ export async function upsertMedicineAction(formData: FormData) {
 
     if (savedBatchId && movementDelta !== 0) {
       await supabase.from("stock_movements").insert({
+        branch_id: branch.id,
         medicine_id: savedMedicineId,
         batch_id: savedBatchId,
         movement_type: "adjustment",
@@ -312,7 +323,7 @@ export async function upsertMedicineAction(formData: FormData) {
 }
 
 export async function archiveMedicineAction(formData: FormData) {
-  const { profile } = await requireAuthenticated();
+  const { profile, branch } = await requireAuthenticated();
   const supabase = createAdminClient();
   const medicineId = asString(formData.get("medicine_id"));
 
@@ -320,7 +331,7 @@ export async function archiveMedicineAction(formData: FormData) {
     redirect("/inventory");
   }
 
-  await supabase.from("medicines").update({ is_active: false }).eq("id", medicineId);
+  await supabase.from("medicines").update({ is_active: false }).eq("id", medicineId).eq("branch_id", branch.id);
   await recordAuditForUser(profile?.id ?? null, "medicines", medicineId, "archived", {});
 
   revalidatePath("/inventory");
@@ -328,8 +339,32 @@ export async function archiveMedicineAction(formData: FormData) {
   redirect("/inventory");
 }
 
+export async function toggleLowStockAlertAction(medicineId: string, enabled: boolean) {
+  const { profile, branch } = await requireAuthenticated();
+  const supabase = createAdminClient();
+
+  if (!medicineId) {
+    throw new Error("Medicine was not found.");
+  }
+
+  const { error } = await supabase
+    .from("medicines")
+    .update({ low_stock_alert_enabled: enabled })
+    .eq("id", medicineId)
+    .eq("branch_id", branch.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await recordAuditForUser(profile?.id ?? null, "medicines", medicineId, enabled ? "low_stock_alert_enabled" : "low_stock_alert_disabled", {});
+  revalidatePath("/inventory");
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+}
+
 export async function deleteBatchAction(formData: FormData) {
-  const { profile } = await requireRole("admin");
+  const { profile, branch } = await requireRole("admin");
   const supabase = createAdminClient();
   const batchId = asString(formData.get("batch_id"));
 
@@ -338,7 +373,7 @@ export async function deleteBatchAction(formData: FormData) {
   }
 
   const [{ data: batch }, { count: saleItemCount }, { count: purchaseItemCount }, { count: returnItemCount }] = await Promise.all([
-    supabase.from("medicine_batches").select("id, batch_number, medicine_id").eq("id", batchId).maybeSingle(),
+    supabase.from("medicine_batches").select("id, batch_number, medicine_id").eq("id", batchId).eq("branch_id", branch.id).maybeSingle(),
     supabase.from("sale_items").select("id", { count: "exact", head: true }).eq("batch_id", batchId),
     supabase.from("purchase_items").select("id", { count: "exact", head: true }).eq("batch_id", batchId),
     supabase.from("sale_return_items").select("id", { count: "exact", head: true }).eq("batch_id", batchId)
@@ -375,12 +410,13 @@ export async function deleteBatchAction(formData: FormData) {
 }
 
 export async function recordPurchaseAction(formData: FormData) {
-  await requireRole("admin");
+  const { branch } = await requireRole("admin");
   const supabase = createClient();
   const items = parseJsonField<Array<Record<string, unknown>>>(formData.get("items_json"), []);
   const supplierId = await resolveSupplierId({
     supplierId: asString(formData.get("supplier_id")),
-    supplierName: asString(formData.get("supplier_name"))
+    supplierName: asString(formData.get("supplier_name")),
+    branchId: branch.id
   });
 
   if (!items.length) {
@@ -388,6 +424,7 @@ export async function recordPurchaseAction(formData: FormData) {
   }
 
   const { data, error } = await supabase.rpc("record_purchase", {
+    p_branch_id: branch.id,
     p_supplier_id: supplierId,
     p_invoice_number: asString(formData.get("invoice_number")) || null,
     p_purchase_date: asString(formData.get("purchase_date")) || null,
@@ -407,7 +444,7 @@ export async function recordPurchaseAction(formData: FormData) {
 }
 
 export async function recordSaleAction(formData: FormData) {
-  await requireAuthenticated();
+  const { branch } = await requireAuthenticated();
   const supabase = createClient();
   const items = parseJsonField<Array<Record<string, unknown>>>(formData.get("items_json"), []);
   const paymentMethod = asString(formData.get("payment_method")) as PaymentMethod;
@@ -417,6 +454,8 @@ export async function recordSaleAction(formData: FormData) {
     items.reduce((total, item) => total + Number(item.quantity ?? 0) * Number(item.unit_price ?? 0), 0)
   );
   const totalAmount = toMoney(Math.max(subtotal - discountAmount + taxAmount, 0));
+  const dueAmount = toMoney(Math.min(Math.max(asNumber(formData.get("due_amount")), 0), totalAmount));
+  const collectedAmount = toMoney(Math.max(totalAmount - dueAmount, 0));
   let cashAmount = toMoney(asNumber(formData.get("cash_amount")));
   let onlineAmount = toMoney(asNumber(formData.get("online_amount")));
   let onlinePaymentMethod = asString(formData.get("online_payment_method")) || null;
@@ -428,7 +467,7 @@ export async function recordSaleAction(formData: FormData) {
   try {
     const paymentBreakdown = resolvePaymentBreakdown({
       paymentMethod,
-      totalAmount,
+      totalAmount: collectedAmount,
       cashAmount,
       onlineAmount,
       onlinePaymentMethod
@@ -441,6 +480,7 @@ export async function recordSaleAction(formData: FormData) {
   }
 
   const { data, error } = await supabase.rpc("record_sale", {
+    p_branch_id: branch.id,
     p_customer_name: asString(formData.get("customer_name")) || null,
     p_discount_amount: discountAmount,
     p_tax_amount: taxAmount,
@@ -449,7 +489,8 @@ export async function recordSaleAction(formData: FormData) {
     p_items: items,
     p_cash_amount: cashAmount,
     p_online_amount: onlineAmount,
-    p_online_payment_method: onlinePaymentMethod
+    p_online_payment_method: onlinePaymentMethod,
+    p_due_amount: dueAmount
   });
 
   if (error || !data) {
@@ -1010,7 +1051,7 @@ export async function toggleUserStatusAction(formData: FormData) {
 }
 
 export async function updateSettingsAction(formData: FormData) {
-  const { profile } = await requireRole("admin");
+  const { profile, branch } = await requireRole("admin");
   const supabase = createAdminClient();
   const settingsId = asString(formData.get("settings_id"));
 
@@ -1026,7 +1067,8 @@ export async function updateSettingsAction(formData: FormData) {
       expiry_alert_days: asNumber(formData.get("expiry_alert_days")) || 45,
       default_low_stock_threshold: asNumber(formData.get("default_low_stock_threshold")) || 10
     })
-    .eq("id", settingsId);
+    .eq("id", settingsId)
+    .eq("branch_id", branch.id);
 
   await recordAuditForUser(profile?.id ?? null, "store_settings", settingsId, "updated", {});
 

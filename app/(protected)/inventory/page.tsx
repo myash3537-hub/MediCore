@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, Archive, Boxes, CircleAlert, CircleCheckBig, Info, PencilLine, Search, Sparkles } from "lucide-react";
 
 import { archiveMedicineAction, deleteBatchAction } from "@/lib/actions/pharmacy";
+import { LowStockToggle } from "@/components/forms/low-stock-toggle";
 import { MedicineForm } from "@/components/forms/medicine-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import { formatCurrency, formatQuantity } from "@/lib/utils";
 type InventoryGroup = {
   medicine_id: string;
   medicine_name: string;
+  generic_name?: string | null;
   category: string;
   rx_required: boolean;
   total_stock_quantity: number;
@@ -56,6 +58,7 @@ function groupInventoryRows(rows: InventorySnapshotRow[]) {
     groups.set(row.medicine_id, {
       medicine_id: row.medicine_id,
       medicine_name: row.medicine_name,
+      generic_name: row.generic_name,
       category: row.category,
       rx_required: row.rx_required,
       total_stock_quantity: row.stock_quantity,
@@ -81,7 +84,9 @@ function filterInventoryGroups(groups: InventoryGroup[], query: string) {
 
   return groups.filter((group) => {
     const medicineMatch =
-      group.medicine_name.toLowerCase().includes(normalizedQuery) || group.category.toLowerCase().includes(normalizedQuery);
+      group.medicine_name.toLowerCase().includes(normalizedQuery) ||
+      (group.generic_name ?? "").toLowerCase().includes(normalizedQuery) ||
+      group.category.toLowerCase().includes(normalizedQuery);
 
     if (medicineMatch) {
       return true;
@@ -209,6 +214,7 @@ export default async function InventoryPage({
               <TableRow key={group.medicine_id}>
                 <TableCell>
                   <p className="font-semibold text-slate-950">{group.medicine_name}</p>
+                  {group.generic_name ? <p className="mt-1 text-sm text-brand-700">{group.generic_name}</p> : null}
                   <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{group.category}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Badge variant="accent">{group.batches.length} batch{group.batches.length === 1 ? "" : "es"}</Badge>
@@ -243,6 +249,9 @@ export default async function InventoryPage({
                     {group.low_stock_batches ? <Badge variant="danger">Low stock</Badge> : <Badge variant="success">Healthy</Badge>}
                     <Badge variant="accent">Batch-managed</Badge>
                   </div>
+                  <div className="mt-3">
+                    <LowStockToggle medicineId={group.medicine_id} enabled={group.low_stock_alert_enabled} />
+                  </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col gap-3">
@@ -262,6 +271,7 @@ export default async function InventoryPage({
                                 medicine_id: batch.medicine_id,
                                 batch_id: batch.batch_id,
                                 name: batch.medicine_name,
+                                generic_name: batch.generic_name,
                                 category: batch.category,
                                 supplier_name: batch.supplier_name,
                                 rx_required: batch.rx_required,

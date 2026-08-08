@@ -68,6 +68,7 @@ export function PosForm({
   const [onlinePaymentMethod, setOnlinePaymentMethod] = useState<OnlinePaymentMethod>("UPI");
   const [discountAmount, setDiscountAmount] = useState(0);
   const [discountPercent, setDiscountPercent] = useState(0);
+  const [dueAmount, setDueAmount] = useState(0);
   const [manualTax, setManualTax] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
 
@@ -78,6 +79,7 @@ export function PosForm({
       const needle = deferredSearch.toLowerCase();
       return (
         row.medicine_name.toLowerCase().includes(needle) ||
+        (row.generic_name ?? "").toLowerCase().includes(needle) ||
         row.batch_number.toLowerCase().includes(needle) ||
         row.category.toLowerCase().includes(needle) ||
         (row.supplier_name ?? "").toLowerCase().includes(needle)
@@ -89,6 +91,8 @@ export function PosForm({
   const autoTax = settings?.tax_enabled ? Number((((subtotal - discountAmount) * settings.tax_rate) / 100).toFixed(2)) : 0;
   const taxAmount = manualTax ?? autoTax;
   const totalAmount = Math.max(subtotal - discountAmount + taxAmount, 0);
+  const safeDueAmount = toMoney(Math.min(Math.max(dueAmount, 0), totalAmount));
+  const collectedAmount = toMoney(Math.max(totalAmount - safeDueAmount, 0));
   const isSplitPayment = paymentMethod === "Split";
 
   useEffect(() => {
@@ -101,25 +105,25 @@ export function PosForm({
 
   useEffect(() => {
     if (paymentMethod === "Cash") {
-      setCashAmount(totalAmount);
+      setCashAmount(collectedAmount);
       setOnlineAmount(0);
       return;
     }
 
     if (paymentMethod === "UPI" || paymentMethod === "Card") {
       setCashAmount(0);
-      setOnlineAmount(totalAmount);
+      setOnlineAmount(collectedAmount);
       setOnlinePaymentMethod(paymentMethod);
       return;
     }
 
-    const halfAmount = Number((totalAmount / 2).toFixed(2));
+    const halfAmount = Number((collectedAmount / 2).toFixed(2));
     setCashAmount(halfAmount);
-    setOnlineAmount(Number((totalAmount - halfAmount).toFixed(2)));
-  }, [paymentMethod, totalAmount]);
+    setOnlineAmount(Number((collectedAmount - halfAmount).toFixed(2)));
+  }, [paymentMethod, collectedAmount]);
 
-  const splitDifference = Number((totalAmount - (cashAmount + onlineAmount)).toFixed(2));
-  const splitValid = !isSplitPayment || (Math.abs(splitDifference) <= 0.01 && (totalAmount === 0 || (cashAmount > 0 && onlineAmount > 0)));
+  const splitDifference = Number((collectedAmount - (cashAmount + onlineAmount)).toFixed(2));
+  const splitValid = !isSplitPayment || (Math.abs(splitDifference) <= 0.01 && (collectedAmount === 0 || (cashAmount > 0 && onlineAmount > 0)));
 
   function addToCart(item: InventorySnapshotRow) {
     setCart((currentCart) => {
@@ -182,9 +186,9 @@ export function PosForm({
   }
 
   function splitEvenly() {
-    const halfAmount = Number((totalAmount / 2).toFixed(2));
+    const halfAmount = Number((collectedAmount / 2).toFixed(2));
     setCashAmount(halfAmount);
-    setOnlineAmount(Number((totalAmount - halfAmount).toFixed(2)));
+    setOnlineAmount(Number((collectedAmount - halfAmount).toFixed(2)));
   }
 
   function updateDiscountAmount(value: number) {
@@ -235,6 +239,7 @@ export function PosForm({
                     <p className="font-semibold text-slate-950">{item.medicine_name}</p>
                     {item.rx_required ? <Badge variant="warning">Rx</Badge> : null}
                   </div>
+                  {item.generic_name ? <p className="mt-1 text-sm font-medium text-brand-700">{item.generic_name}</p> : null}
                   <p className="mt-2 text-sm text-slate-600">
                     {item.category} • Batch {item.batch_number} • Expires {item.expiry_date}
                   </p>
@@ -274,8 +279,9 @@ export function PosForm({
           />
           <input type="hidden" name="discount_amount" value={discountAmount} />
           <input type="hidden" name="tax_amount" value={taxAmount} />
-          <input type="hidden" name="cash_amount" value={paymentMethod === "Cash" ? totalAmount : paymentMethod === "Split" ? cashAmount : 0} />
-          <input type="hidden" name="online_amount" value={paymentMethod === "Cash" ? 0 : paymentMethod === "Split" ? onlineAmount : totalAmount} />
+          <input type="hidden" name="due_amount" value={safeDueAmount} />
+          <input type="hidden" name="cash_amount" value={paymentMethod === "Cash" ? collectedAmount : paymentMethod === "Split" ? cashAmount : 0} />
+          <input type="hidden" name="online_amount" value={paymentMethod === "Cash" ? 0 : paymentMethod === "Split" ? onlineAmount : collectedAmount} />
           <input
             type="hidden"
             name="online_payment_method"
@@ -349,7 +355,7 @@ export function PosForm({
               <div className={`rounded-2xl px-4 py-3 text-sm font-medium ${splitValid ? "bg-white text-brand-900" : "bg-rose-50 text-rose-900"}`}>
                 {splitValid
                   ? `Split ready: Cash ${formatCurrency(cashAmount, settings?.currency_code ?? "INR")} + ${onlinePaymentMethod} ${formatCurrency(onlineAmount, settings?.currency_code ?? "INR")}`
-                  : `Cash and online amounts must add up to ${formatCurrency(totalAmount, settings?.currency_code ?? "INR")}. Remaining difference: ${formatCurrency(splitDifference, settings?.currency_code ?? "INR")}`}
+                  : `Cash and online amounts must add up to ${formatCurrency(collectedAmount, settings?.currency_code ?? "INR")}. Remaining difference: ${formatCurrency(splitDifference, settings?.currency_code ?? "INR")}`}
               </div>
             </div>
           ) : null}
@@ -421,7 +427,7 @@ export function PosForm({
             )}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-4">
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-800">Discount amount</label>
               <Input type="number" min={0} step="0.01" value={discountAmount} onChange={(event) => updateDiscountAmount(Number(event.target.value) || 0)} />
@@ -437,6 +443,11 @@ export function PosForm({
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-800">Tax amount</label>
               <Input type="number" min={0} step="0.01" value={taxAmount} onChange={(event) => setManualTax(Number(event.target.value) || 0)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-800">Due amount</label>
+              <Input type="number" min={0} max={totalAmount} step="0.01" value={dueAmount} onChange={(event) => setDueAmount(Number(event.target.value) || 0)} />
+              <p className="text-xs text-slate-500">Unpaid balance for this bill.</p>
             </div>
           </div>
 
@@ -466,10 +477,18 @@ export function PosForm({
                 <span className="text-slate-300">Tax</span>
                 <span>{formatCurrency(taxAmount, settings?.currency_code ?? "INR")}</span>
               </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-300">Customer due</span>
+                <span>{formatCurrency(safeDueAmount, settings?.currency_code ?? "INR")}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-300">Bill total</span>
+                <span>{formatCurrency(totalAmount, settings?.currency_code ?? "INR")}</span>
+              </div>
             </div>
             <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-4">
-              <span className="text-sm uppercase tracking-[0.2em] text-slate-300">Amount due</span>
-              <span className="font-display text-3xl font-semibold">{formatCurrency(totalAmount, settings?.currency_code ?? "INR")}</span>
+              <span className="text-sm uppercase tracking-[0.2em] text-slate-300">Collect now</span>
+              <span className="font-display text-3xl font-semibold">{formatCurrency(collectedAmount, settings?.currency_code ?? "INR")}</span>
             </div>
           </div>
 

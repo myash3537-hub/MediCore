@@ -54,9 +54,9 @@ function buildDailySeries(rows: Array<{ sale_date: string; total_amount: number 
 }
 
 export async function getStoreSettings() {
-  await requireAuthenticated();
+  const { branch } = await requireAuthenticated();
   const supabase = createAdminClient();
-  const { data } = await supabase.from("store_settings").select("*").limit(1).maybeSingle();
+  const { data } = await supabase.from("store_settings").select("*").eq("branch_id", branch.id).limit(1).maybeSingle();
   if (!data) {
     return null;
   }
@@ -68,16 +68,16 @@ export async function getStoreSettings() {
 }
 
 export async function getSuppliers() {
-  await requireAuthenticated();
+  const { branch } = await requireAuthenticated();
   const supabase = createAdminClient();
-  const { data } = await supabase.from("suppliers").select("*").order("name");
+  const { data } = await supabase.from("suppliers").select("*").eq("branch_id", branch.id).order("name");
   return (data as Supplier[] | null) ?? [];
 }
 
 export async function getInventorySnapshot() {
-  await requireAuthenticated();
+  const { branch } = await requireAuthenticated();
   const supabase = createAdminClient();
-  const data = await fetchAllRows<InventorySnapshotRow>(() => supabase.from("inventory_snapshot").select("*").order("medicine_name"));
+  const data = await fetchAllRows<InventorySnapshotRow>(() => supabase.from("inventory_snapshot").select("*").eq("branch_id", branch.id).order("medicine_name"));
   return data.map((row) => ({
     ...row,
     stock_quantity: toNumber(row.stock_quantity),
@@ -90,11 +90,12 @@ export async function getInventorySnapshot() {
 }
 
 export async function getMedicinesCatalog() {
-  await requireAuthenticated();
+  const { branch } = await requireAuthenticated();
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("medicines")
-    .select("id, name, category, rx_required, default_supplier_id")
+    .select("id, name, generic_name, category, rx_required, default_supplier_id")
+    .eq("branch_id", branch.id)
     .eq("is_active", true)
     .order("name");
 
@@ -102,11 +103,12 @@ export async function getMedicinesCatalog() {
 }
 
 export async function getNotifications(role: Profile["role"], limit = 6) {
-  await requireAuthenticated();
+  const { branch } = await requireAuthenticated();
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("notifications")
     .select("*")
+    .or(`branch_id.is.null,branch_id.eq.${branch.id}`)
     .or(`target_role.is.null,target_role.eq.${role}`)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -117,6 +119,7 @@ export async function getNotifications(role: Profile["role"], limit = 6) {
 export async function getDashboardData() {
   const sessionContext = await requireAuthenticated();
   const profile = sessionContext.profile as Profile;
+  const branch = sessionContext.branch;
   const supabase = createAdminClient();
   const today = startOfDay(new Date());
   const monthStart = startOfMonth(new Date());
@@ -127,12 +130,14 @@ export async function getDashboardData() {
     supabase
       .from("sales")
       .select("id, sale_date, total_amount")
+      .eq("branch_id", branch.id)
       .gte("sale_date", subDays(today, 6).toISOString())
       .order("sale_date"),
-    supabase.from("sales").select("total_amount, sale_date").gte("sale_date", monthStart.toISOString()),
+    supabase.from("sales").select("total_amount, sale_date").eq("branch_id", branch.id).gte("sale_date", monthStart.toISOString()),
     supabase
       .from("sales")
-      .select("id, invoice_number, sale_date, customer_name, subtotal, discount_amount, tax_amount, total_amount, payment_method, cash_amount, online_amount, online_payment_method")
+      .select("id, invoice_number, sale_date, customer_name, subtotal, discount_amount, tax_amount, total_amount, due_amount, payment_method, cash_amount, online_amount, online_payment_method")
+      .eq("branch_id", branch.id)
       .order("sale_date", { ascending: false })
       .limit(6),
     getNotifications(profile.role)
@@ -149,6 +154,7 @@ export async function getDashboardData() {
     discount_amount: toNumber(sale.discount_amount),
     tax_amount: toNumber(sale.tax_amount),
     total_amount: toNumber(sale.total_amount),
+    due_amount: toNumber(sale.due_amount),
     payment_method: sale.payment_method as PaymentMethod,
     cash_amount: toNumber(sale.cash_amount),
     online_amount: toNumber(sale.online_amount),
@@ -197,10 +203,9 @@ export async function getDashboardData() {
 
   const inventoryValue = inventoryRows.reduce((total, row) => total + row.stock_quantity * row.purchase_price, 0);
   const totalUnits = inventoryRows.reduce((total, row) => total + row.stock_quantity, 0);
-  const stockLevels: ChartDatum[] = inventoryRows
+  const stockLevels: ChartDatum[] = lowStockItems
     .slice()
     .sort((a, b) => a.stock_quantity - b.stock_quantity)
-    .slice(0, 6)
     .map((item) => ({
       label: item.medicine_name,
       value: item.stock_quantity
@@ -228,7 +233,7 @@ export async function getDashboardData() {
 }
 
 export async function getBillingData() {
-  const { profile } = await requireAuthenticated();
+  const { profile, branch } = await requireAuthenticated();
   const supabase = createAdminClient();
   const [settings, inventoryRows, recentSales, editableSalesRows] = await Promise.all([
     getStoreSettings(),
@@ -239,8 +244,9 @@ export async function getBillingData() {
           supabase
             .from("sales")
             .select(
-              "id, invoice_number, sale_date, customer_name, subtotal, discount_amount, tax_amount, total_amount, payment_method, cash_amount, online_amount, online_payment_method, notes, sale_items(id, medicine_id, batch_id, quantity, unit_price, line_total, medicines(name), medicine_batches(batch_number))"
+              "id, invoice_number, sale_date, customer_name, subtotal, discount_amount, tax_amount, total_amount, due_amount, payment_method, cash_amount, online_amount, online_payment_method, notes, sale_items(id, medicine_id, batch_id, quantity, unit_price, line_total, medicines(name), medicine_batches(batch_number))"
             )
+            .eq("branch_id", branch.id)
             .order("sale_date", { ascending: false })
         )
       : Promise.resolve([])
@@ -256,13 +262,13 @@ export async function getBillingData() {
 }
 
 export async function getRecentSales(limit?: number) {
-  await requireAuthenticated();
+  const { branch } = await requireAuthenticated();
   const supabase = createAdminClient();
-  const selectColumns = "id, invoice_number, sale_date, customer_name, subtotal, discount_amount, tax_amount, total_amount, payment_method, cash_amount, online_amount, online_payment_method";
+  const selectColumns = "id, invoice_number, sale_date, customer_name, subtotal, discount_amount, tax_amount, total_amount, due_amount, payment_method, cash_amount, online_amount, online_payment_method";
   const data =
     typeof limit === "number"
-      ? (((await supabase.from("sales").select(selectColumns).order("sale_date", { ascending: false }).limit(limit)).data as SaleSummary[] | null) ?? [])
-      : await fetchAllRows<SaleSummary>(() => supabase.from("sales").select(selectColumns).order("sale_date", { ascending: false }));
+      ? (((await supabase.from("sales").select(selectColumns).eq("branch_id", branch.id).order("sale_date", { ascending: false }).limit(limit)).data as SaleSummary[] | null) ?? [])
+      : await fetchAllRows<SaleSummary>(() => supabase.from("sales").select(selectColumns).eq("branch_id", branch.id).order("sale_date", { ascending: false }));
 
   return data.map((sale) => ({
     ...sale,
@@ -270,6 +276,7 @@ export async function getRecentSales(limit?: number) {
     discount_amount: toNumber(sale.discount_amount),
     tax_amount: toNumber(sale.tax_amount),
     total_amount: toNumber(sale.total_amount),
+    due_amount: toNumber(sale.due_amount),
     cash_amount: toNumber(sale.cash_amount),
     online_amount: toNumber(sale.online_amount),
     online_payment_method: (sale.online_payment_method as OnlinePaymentMethod | null | undefined) ?? null
@@ -292,13 +299,13 @@ export async function getPurchaseData() {
 }
 
 export async function getRecentPurchases(limit?: number) {
-  await requireAuthenticated();
+  const { branch } = await requireAuthenticated();
   const supabase = createAdminClient();
   const selectColumns = "id, invoice_number, purchase_date, subtotal, total_amount, supplier_id, suppliers(id, name)";
   const data =
     typeof limit === "number"
-      ? (((await supabase.from("purchases").select(selectColumns).order("purchase_date", { ascending: false }).limit(limit)).data as PurchaseSummary[] | null) ?? [])
-      : await fetchAllRows<PurchaseSummary>(() => supabase.from("purchases").select(selectColumns).order("purchase_date", { ascending: false }));
+      ? (((await supabase.from("purchases").select(selectColumns).eq("branch_id", branch.id).order("purchase_date", { ascending: false }).limit(limit)).data as PurchaseSummary[] | null) ?? [])
+      : await fetchAllRows<PurchaseSummary>(() => supabase.from("purchases").select(selectColumns).eq("branch_id", branch.id).order("purchase_date", { ascending: false }));
 
   return data.map((purchase) => ({
     ...purchase,
@@ -308,7 +315,7 @@ export async function getRecentPurchases(limit?: number) {
 }
 
 export async function getReturnsData() {
-  const { profile } = await requireAuthenticated();
+  const { profile, branch } = await requireAuthenticated();
   const supabase = createAdminClient();
   const [settings, recentReturns, saleCandidates, editableReturns] = await Promise.all([
     getStoreSettings(),
@@ -316,12 +323,14 @@ export async function getReturnsData() {
       supabase
         .from("sales_returns")
         .select("id, refund_amount, reason, return_date, sale_id, sales(invoice_number, customer_name)")
+        .eq("branch_id", branch.id)
         .order("return_date", { ascending: false })
     ),
     fetchAllRows<Record<string, unknown>>(() =>
       supabase
         .from("sales")
         .select("id, invoice_number, customer_name, total_amount, sale_date, sale_items(id, quantity, unit_price, line_total, batch_id, medicine_id, medicines(name), medicine_batches(batch_number, tablets_per_strip))")
+        .eq("branch_id", branch.id)
         .order("sale_date", { ascending: false })
     ),
     profile.role === "admin"
@@ -331,6 +340,7 @@ export async function getReturnsData() {
             .select(
               "id, refund_amount, reason, return_date, sale_id, sales(invoice_number, customer_name), sale_return_items(id, sale_item_id, batch_id, quantity, refund_amount, sale_items(quantity, unit_price, medicines(name), medicine_batches(batch_number)))"
             )
+            .eq("branch_id", branch.id)
             .order("return_date", { ascending: false })
         )
       : Promise.resolve([])

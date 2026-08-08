@@ -20,6 +20,7 @@ type InvoicePayload = {
   discountAmount: number;
   taxAmount: number;
   totalAmount: number;
+  dueAmount: number;
   notes?: string | null;
   currencyCode: string;
   items: InvoiceItem[];
@@ -103,6 +104,8 @@ export async function buildInvoicePdf(payload: InvoicePayload) {
     ["Subtotal", payload.subtotal],
     ["Discount", payload.discountAmount],
     ["Tax", payload.taxAmount],
+    ["Customer Due", payload.dueAmount],
+    ["Collected", Math.max(payload.totalAmount - payload.dueAmount, 0)],
     ["Grand Total", payload.totalAmount]
   ] as const;
 

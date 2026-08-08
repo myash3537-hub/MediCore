@@ -3,14 +3,16 @@ import { Bell, LogOut, UserCircle2, Users } from "lucide-react";
 import { signOutAction } from "@/lib/actions/auth";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
-import { Profile } from "@/lib/types";
+import { Branch, Profile } from "@/lib/types";
 
 export function AppShell({
   children,
-  profile
+  profile,
+  branch
 }: Readonly<{
   children: React.ReactNode;
   profile: Profile;
+  branch: Branch;
 }>) {
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[280px_1fr]">
@@ -30,7 +32,7 @@ export function AppShell({
                     Retail pharmacy command center
                   </h1>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                    Run the floor, protect margins, and keep every batch, bill, and alert under one sharp operational view.
+                    {branch.name} branch. Run the floor, protect margins, and keep every batch, bill, and alert under one sharp operational view.
                   </p>
                 </div>
                 <div className="flex items-center gap-3">

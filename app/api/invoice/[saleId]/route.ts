@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 import { buildInvoicePdf } from "@/lib/pdf/invoice";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -16,17 +17,19 @@ export async function GET(_request: Request, { params }: { params: { saleId: str
   }
 
   const admin = createAdminClient();
+  const branchId = cookies().get("srs_branch_id")?.value ?? "";
   const [{ data: sale }, { data: items }, { data: settings }] = await Promise.all([
     admin
       .from("sales")
-      .select("id, invoice_number, sale_date, customer_name, subtotal, discount_amount, tax_amount, total_amount, payment_method, cash_amount, online_amount, online_payment_method, notes")
+      .select("id, invoice_number, sale_date, customer_name, subtotal, discount_amount, tax_amount, total_amount, due_amount, payment_method, cash_amount, online_amount, online_payment_method, notes")
       .eq("id", params.saleId)
+      .eq("branch_id", branchId)
       .maybeSingle(),
     admin
       .from("sale_items")
       .select("quantity, unit_price, line_total, medicines(name), medicine_batches(batch_number)")
       .eq("sale_id", params.saleId),
-    admin.from("store_settings").select("*").limit(1).maybeSingle()
+    admin.from("store_settings").select("*").eq("branch_id", branchId).limit(1).maybeSingle()
   ]);
 
   if (!sale) {
@@ -54,6 +57,7 @@ export async function GET(_request: Request, { params }: { params: { saleId: str
     discountAmount: Number((sale as { discount_amount?: number }).discount_amount ?? 0),
     taxAmount: Number((sale as { tax_amount?: number }).tax_amount ?? 0),
     totalAmount: Number((sale as { total_amount?: number }).total_amount ?? 0),
+    dueAmount: Number((sale as { due_amount?: number }).due_amount ?? 0),
     notes: (sale as { notes?: string | null }).notes ?? null,
     currencyCode,
     items: ((items as Array<Record<string, unknown>> | null) ?? []).map((item) => ({

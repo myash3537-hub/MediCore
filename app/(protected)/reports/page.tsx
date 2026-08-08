@@ -87,7 +87,10 @@ export default async function ReportsPage() {
               <TableBody>
                 {data.inventoryRows.map((row) => (
                   <TableRow key={row.batch_id}>
-                    <TableCell>{row.medicine_name}</TableCell>
+                    <TableCell>
+                      <p className="font-semibold text-slate-950">{row.medicine_name}</p>
+                      {row.generic_name ? <p className="text-xs text-brand-700">{row.generic_name}</p> : null}
+                    </TableCell>
                     <TableCell>{row.batch_number}</TableCell>
                     <TableCell>{formatQuantity(row.stock_quantity)}</TableCell>
                     <TableCell>{formatCurrency(row.selling_price, currency)}</TableCell>
@@ -113,7 +116,10 @@ export default async function ReportsPage() {
               <TableBody>
                 {data.expiringItems.map((row) => (
                   <TableRow key={row.batch_id}>
-                    <TableCell>{row.medicine_name}</TableCell>
+                    <TableCell>
+                      <p className="font-semibold text-slate-950">{row.medicine_name}</p>
+                      {row.generic_name ? <p className="text-xs text-brand-700">{row.generic_name}</p> : null}
+                    </TableCell>
                     <TableCell>{row.expiry_date}</TableCell>
                     <TableCell>{formatQuantity(row.stock_quantity)}</TableCell>
                     <TableCell>{row.category}</TableCell>

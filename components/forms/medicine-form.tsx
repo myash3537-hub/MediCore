@@ -12,6 +12,7 @@ type MedicineFormValues = {
   medicine_id?: string;
   batch_id?: string;
   name?: string;
+  generic_name?: string | null;
   category?: string;
   supplier_id?: string | null;
   supplier_name?: string | null;
@@ -47,10 +48,14 @@ export function MedicineForm({
       <input type="hidden" name="medicine_id" defaultValue={initial?.medicine_id ?? ""} />
       <input type="hidden" name="batch_id" defaultValue={initial?.batch_id ?? ""} />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-2">
           <label className="text-sm font-semibold text-slate-800">Medicine name</label>
           <Input name="name" required defaultValue={initial?.name ?? ""} placeholder="Paracetamol 650" />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-semibold text-slate-800">Generic name</label>
+          <Input name="generic_name" defaultValue={initial?.generic_name ?? ""} placeholder="Paracetamol" />
         </div>
         <div className="space-y-2">
           <label className="text-sm font-semibold text-slate-800">Category</label>

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -52,6 +53,7 @@ export async function GET(_request: Request, { params }: { params: { resource: s
   }
 
   const admin = createAdminClient();
+  const branchId = cookies().get("srs_branch_id")?.value ?? "";
   const { data: profile } = await admin.from("profiles").select("role").eq("id", session.user.id).maybeSingle();
   const role = String((profile as { role?: string } | null)?.role ?? "pharmacist");
   const resource = params.resource;
@@ -61,14 +63,16 @@ export async function GET(_request: Request, { params }: { params: { resource: s
     rows = await fetchAllRows(() =>
       admin
         .from("sales")
-        .select("invoice_number, sale_date, customer_name, payment_method, cash_amount, online_amount, online_payment_method, subtotal, discount_amount, tax_amount, total_amount")
+        .select("invoice_number, sale_date, customer_name, payment_method, cash_amount, online_amount, online_payment_method, subtotal, discount_amount, tax_amount, total_amount, due_amount")
+        .eq("branch_id", branchId)
         .order("sale_date", { ascending: false })
     );
   } else if (resource === "inventory") {
     const inventoryRows = await fetchAllRows(() =>
       admin
         .from("inventory_snapshot")
-        .select("medicine_name, category, batch_number, expiry_date, stock_quantity, purchase_price, selling_price, tablets_per_strip, supplier_name, rx_required")
+        .select("medicine_name, generic_name, category, batch_number, expiry_date, stock_quantity, purchase_price, selling_price, tablets_per_strip, supplier_name, rx_required")
+        .eq("branch_id", branchId)
         .order("medicine_name")
     );
     rows = inventoryRows.map((row) =>
@@ -76,6 +80,7 @@ export async function GET(_request: Request, { params }: { params: { resource: s
         ? row
         : {
             medicine_name: row.medicine_name,
+            generic_name: row.generic_name,
             category: row.category,
             batch_number: row.batch_number,
             expiry_date: row.expiry_date,
@@ -90,7 +95,8 @@ export async function GET(_request: Request, { params }: { params: { resource: s
     rows = await fetchAllRows(() =>
       admin
         .from("expiry_alerts")
-        .select("medicine_name, category, batch_number, expiry_date, stock_quantity, tablets_per_strip, supplier_name")
+        .select("medicine_name, generic_name, category, batch_number, expiry_date, stock_quantity, tablets_per_strip, supplier_name")
+        .eq("branch_id", branchId)
         .order("expiry_date")
     );
   } else if (resource === "purchases") {
@@ -102,6 +108,7 @@ export async function GET(_request: Request, { params }: { params: { resource: s
       admin
         .from("purchases")
         .select("invoice_number, purchase_date, subtotal, total_amount, suppliers(name)")
+        .eq("branch_id", branchId)
         .order("purchase_date", { ascending: false })
     );
     rows = (purchaseRows.map((row) => ({

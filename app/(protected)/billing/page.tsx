@@ -64,6 +64,7 @@ export default async function BillingPage({
                 <TableHeaderCell>Customer</TableHeaderCell>
                 <TableHeaderCell>Payment</TableHeaderCell>
                 <TableHeaderCell>Total</TableHeaderCell>
+                <TableHeaderCell>Due</TableHeaderCell>
                 <TableHeaderCell>Invoice</TableHeaderCell>
               </tr>
             </TableHead>
@@ -76,6 +77,7 @@ export default async function BillingPage({
                     <TableCell>{sale.customer_name || "Walk-in customer"}</TableCell>
                     <TableCell>{formatPaymentLabel(sale, currency)}</TableCell>
                     <TableCell>{formatCurrency(sale.total_amount, currency)}</TableCell>
+                    <TableCell>{formatCurrency(sale.due_amount ?? 0, currency)}</TableCell>
                     <TableCell>
                       <Link href={`/api/invoice/${sale.id}`} className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700">
                         <Receipt className="h-4 w-4" />
@@ -86,7 +88,7 @@ export default async function BillingPage({
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-sm text-slate-500">
+                  <TableCell colSpan={7} className="text-sm text-slate-500">
                     No sales have been recorded yet. Complete a sale to generate the first invoice and history row.
                   </TableCell>
                 </TableRow>

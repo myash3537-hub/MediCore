@@ -12,6 +12,7 @@ import { formatCurrency } from "@/lib/utils";
 type MedicineOption = {
   id: string;
   name: string;
+  generic_name?: string | null;
   category: string;
   rx_required: boolean;
   default_supplier_id?: string | null;
@@ -47,7 +48,10 @@ export function PurchaseForm({
   const deferredSearch = useDeferredValue(search);
 
   const filteredRows = catalog
-    .filter((item) => item.name.toLowerCase().includes(deferredSearch.toLowerCase()) || item.category.toLowerCase().includes(deferredSearch.toLowerCase()))
+    .filter((item) => {
+      const needle = deferredSearch.toLowerCase();
+      return item.name.toLowerCase().includes(needle) || (item.generic_name ?? "").toLowerCase().includes(needle) || item.category.toLowerCase().includes(needle);
+    })
     .slice(0, 10);
 
   const totalAmount = rows.reduce((total, item) => total + item.quantity * item.purchase_price, 0);
@@ -110,6 +114,7 @@ export function PurchaseForm({
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="font-semibold text-slate-950">{medicine.name}</p>
+                  {medicine.generic_name ? <p className="mt-1 text-sm font-medium text-brand-700">{medicine.generic_name}</p> : null}
                   <p className="mt-2 text-sm text-slate-600">{medicine.category}</p>
                 </div>
                 <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-brand-800">
@@ -184,6 +189,7 @@ export function PurchaseForm({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold text-slate-950">{row.name}</p>
+                      {row.generic_name ? <p className="mt-1 text-sm font-medium text-brand-700">{row.generic_name}</p> : null}
                       <p className="mt-2 text-sm text-slate-600">{row.category}</p>
                     </div>
                     <button type="button" onClick={() => removeRow(row.id)} className="rounded-2xl p-2 text-slate-500 transition hover:bg-rose-50 hover:text-rose-600">

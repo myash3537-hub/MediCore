@@ -4,6 +4,7 @@ import { Loader2, LogIn } from "lucide-react";
 import { useFormStatus } from "react-dom";
 
 import { signInAction } from "@/lib/actions/auth";
+import { Branch } from "@/lib/types";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -20,9 +21,35 @@ function SubmitButton() {
   );
 }
 
-export function LoginForm() {
+export function LoginForm({
+  branches
+}: Readonly<{
+  branches: Branch[];
+}>) {
   return (
     <form action={signInAction} className="space-y-5 rounded-[28px] border border-slate-200 bg-white p-7 shadow-soft">
+      <div className="space-y-2">
+        <label className="block text-sm font-semibold text-slate-800" htmlFor="branch_id">
+          Branch
+        </label>
+        <select
+          id="branch_id"
+          name="branch_id"
+          required
+          className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-900 outline-none ring-0 transition focus:border-brand-400 focus:bg-white"
+          defaultValue={branches[0]?.id ?? ""}
+        >
+          <option value="" disabled>
+            Select branch
+          </option>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>
+              {branch.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="space-y-2">
         <label className="block text-sm font-semibold text-slate-800" htmlFor="email">
           Email address

@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { CircleAlert, ShieldCheck } from "lucide-react";
 
 import { LoginForm } from "@/components/forms/login-form";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { Branch } from "@/lib/types";
 
 export default async function LoginPage({
   searchParams
@@ -16,9 +19,17 @@ export default async function LoginPage({
     data: { session }
   } = await supabase.auth.getSession();
 
-  if (session) {
+  const selectedBranchId = cookies().get("srs_branch_id")?.value ?? "";
+  if (session && selectedBranchId) {
     redirect("/dashboard");
   }
+
+  const admin = createAdminClient();
+  const { data: branches } = await admin
+    .from("branches")
+    .select("id, name, code, is_active, created_at")
+    .eq("is_active", true)
+    .order("created_at");
 
   return (
     <main className="min-h-screen px-6 py-10">
@@ -77,7 +88,7 @@ export default async function LoginPage({
                 <span>{decodeURIComponent(searchParams.error)}</span>
               </div>
             ) : null}
-            <LoginForm />
+            <LoginForm branches={(branches as Branch[] | null) ?? []} />
           </div>
         </section>
       </div>
