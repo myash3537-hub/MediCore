@@ -16,7 +16,7 @@ export function AppShell({
 }>) {
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[280px_1fr]">
-      <Sidebar profile={profile} />
+      <Sidebar profile={profile} branch={branch} />
       <div className="relative min-w-0">
         <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[360px] bg-[radial-gradient(circle_at_top,rgba(32,166,99,0.16),transparent_44%),radial-gradient(circle_at_78%_18%,rgba(38,158,162,0.18),transparent_32%)]" />
         <header className="sticky top-0 z-20 px-4 py-4 sm:px-6 lg:px-8">

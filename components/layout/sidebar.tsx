@@ -6,7 +6,7 @@ import { ClipboardList, FileText, LayoutDashboard, Package2, Receipt, Settings, 
 
 import { signOutAction } from "@/lib/actions/auth";
 import { navItems } from "@/lib/constants";
-import { Profile } from "@/lib/types";
+import { Branch, Profile } from "@/lib/types";
 import { cn, initialsFromName } from "@/lib/utils";
 
 const iconMap = {
@@ -20,7 +20,7 @@ const iconMap = {
   Users
 };
 
-export function Sidebar({ profile }: Readonly<{ profile: Profile }>) {
+export function Sidebar({ profile, branch }: Readonly<{ profile: Profile; branch: Branch }>) {
   const pathname = usePathname();
   const allowedItems = navItems.filter((item) => !item.roles || item.roles.includes(profile.role));
 
@@ -35,6 +35,7 @@ export function Sidebar({ profile }: Readonly<{ profile: Profile }>) {
           <div>
             <p className="font-display text-lg font-semibold leading-tight">THE SR&apos;S PHARMACY</p>
             <p className="text-sm text-slate-300">Cloud pharmacy suite</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-brand-200">{branch.name}</p>
           </div>
         </div>
 
