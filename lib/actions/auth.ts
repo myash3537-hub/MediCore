@@ -22,6 +22,7 @@ export async function signInAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "").trim();
   const branchId = String(formData.get("branch_id") ?? "").trim();
+  let loginError = "";
 
   if (!email || !password || !branchId) {
     redirect("/login?error=Enter%20email,%20password,%20and%20branch.");
@@ -35,10 +36,14 @@ export async function signInAction(formData: FormData) {
     });
 
     if (error) {
-      redirect(`/login?error=${encodeURIComponent(error.message)}`);
+      loginError = error.message;
     }
   } catch (error) {
-    redirect(`/login?error=${encodeURIComponent(normalizeAuthError(error))}`);
+    loginError = normalizeAuthError(error);
+  }
+
+  if (loginError) {
+    redirect(`/login?error=${encodeURIComponent(loginError)}`);
   }
 
   cookies().set("srs_branch_id", branchId, {

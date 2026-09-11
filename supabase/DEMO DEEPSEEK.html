@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THE SR'S HOSPITAL AND TRAUMA CENTRE</title>
+    <style>
+        /* ===== RESET & BASE ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        html {
+            scroll-behavior: smooth;
+        }
+        body {
+            background: #fff;
+            color: #333;
+            line-height: 1.6;
+        }
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+        ul {
+            list-style: none;
+        }
+
+        /* ===== HEADER ===== */
+        header {
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        .header-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .logo-icon {
+            background: #1e88e5;
+            color: #fff;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .logo-text h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1e88e5;
+            line-height: 1.2;
+        }
+        .logo-text span {
+            font-size: 13px;
+            color: #34a853;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+        nav ul {
+            display: flex;
+            gap: 25px;
+        }
+        nav ul li a {
+            font-weight: 500;
+            padding: 5px 0;
+            border-bottom: 2px solid transparent;
+            transition: 0.3s;
+        }
+        nav ul li a:hover {
+            color: #1e88e5;
+            border-bottom: 2px solid #1e88e5;
+        }
+        .btn-booking {
+            background: #1e88e5;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-weight: 600;
+            transition: 0.3s;
+        }
+        .btn-booking:hover {
+            background: #1565c0;
+        }
+        .hamburger {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+        }
+        .hamburger span {
+            height: 3px;
+            width: 25px;
+            background: #333;
+            margin: 3px 0;
+        }
+
+        /* ===== HERO ===== */
+        .hero {
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)),
+                        url('https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80') center/cover no-repeat;
+            min-height: 600px;
+            display: flex;
+            align-items: center;
+            text-align: center;
+            color: #fff;
+        }
+        .hero-content {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .hero h2 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .hero p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        .hero .btn-primary {
+            background: #34a853;
+            color: #fff;
+            padding: 12px 30px;
+            font-size: 18px;
+            border-radius: 30px;
+            font-weight: 600;
+            transition: 0.3s;
+            display: inline-block;
+        }
+        .hero .btn-primary:hover {
+            background: #2d8f47;
+            transform: scale(1.05);
+        }
+
+        /* ===== STATS ===== */
+        .stats {
+            background: #1e88e5;
+            color: #fff;
+            padding: 50px 0;
+        }
+        .stats-grid {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            flex-wrap: wrap;
+            gap: 30px;
+        }
+        .stat-item h3 {
+            font-size: 42px;
+        }
+        .stat-item p {
+            font-size: 16px;
+            margin-top: 5px;
+        }
+
+        /* ===== ABOUT ===== */
+        .about {
+            padding: 80px 0;
+        }
+        .about-grid {
+            display: flex;
+            align-items: center;
+            gap: 50px;
+            flex-wrap: wrap;
+        }
+        .about-image {
+            flex: 1;
+            min-width: 300px;
+        }
+        .about-image img {
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .about-text {
+            flex: 1;
+            min-width: 300px;
+        }
+        .about-text h2 {
+            font-size: 36px;
+            color: #1e88e5;
+            margin-bottom: 20px;
+            position: relative;
+            padding-bottom: 10px;
+        }
+        .about-text h2::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 50px;
+            height: 3px;
+            background: #34a853;
+        }
+        .about-text p {
+            margin-bottom: 15px;
+            color: #555;
+        }
+        .about-text .btn-secondary {
+            background: #34a853;
+            color: #fff;
+            padding: 10px 25px;
+            border-radius: 30px;
+            display: inline-block;
+            margin-top: 10px;
+            transition: 0.3s;
+        }
+        .about-text .btn-secondary:hover {
+            background: #2d8f47;
+        }
+
+        /* ===== SERVICES ===== */
+        .services {
+            background: #f4f8fc;
+            padding: 80px 0;
+        }
+        .section-header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+        .section-header h2 {
+            font-size: 36px;
+            color: #1e88e5;
+        }
+        .section-header p {
+            max-width: 600px;
+            margin: 10px auto 0;
+            color: #666;
+        }
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+        .service-card {
+            background: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: 0.3s;
+        }
+        .service-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .service-card .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #1e88e5;
+        }
+        .service-card h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .service-card p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* ===== DEPARTMENTS ===== */
+        .departments {
+            padding: 80px 0;
+        }
+        .dept-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+        }
+        .dept-item {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: 0.3s;
+        }
+        .dept-item:hover {
+            background: #bbdefb;
+            transform: scale(1.02);
+        }
+        .dept-item .dept-icon {
+            font-size: 28px;
+            background: #1e88e5;
+            color: #fff;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .dept-item span {
+            font-weight: 600;
+        }
+
+        /* ===== DOCTORS ===== */
+        .doctors {
+            background: #f4f8fc;
+            padding: 80px 0;
+        }
+        .doctors-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+        .doctor-card {
+            background: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            text-align: center;
+            transition: 0.3s;
+        }
+        .doctor-card:hover {
+            transform: translateY(-5px);
+        }
+        .doctor-photo {
+            height: 250px;
+            background: linear-gradient(135deg, #1e88e5, #34a853);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            color: #fff;
+        }
+        .doctor-info {
+            padding: 20px;
+        }
+        .doctor-info h3 {
+            color: #333;
+        }
+        .doctor-info span {
+            color: #1e88e5;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .doctor-info p {
+            color: #777;
+            font-size: 13px;
+            margin-top: 5px;
+        }
+
+        /* ===== APPOINTMENT ===== */
+        .appointment {
+            padding: 80px 0;
+        }
+        .appointment-grid {
+            display: flex;
+            gap: 50px;
+            flex-wrap: wrap;
+        }
+        .appointment-form {
+            flex: 1;
+            min-width: 300px;
+            background: #f9f9f9;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .appointment-form h2 {
+            margin-bottom: 20px;
+            color: #1e88e5;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            outline: none;
+            transition: 0.3s;
+        }
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: #1e88e5;
+        }
+        .appointment-form .btn-submit {
+            background: #1e88e5;
+            color: #fff;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .appointment-form .btn-submit:hover {
+            background: #1565c0;
+        }
+        .appointment-info {
+            flex: 1;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .appointment-info h2 {
+            font-size: 32px;
+            color: #1e88e5;
+            margin-bottom: 20px;
+        }
+        .info-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .info-item .icon {
+            font-size: 24px;
+        }
+        .info-item h4 {
+            margin-bottom: 5px;
+        }
+        .info-item p {
+            color: #666;
+        }
+
+        /* ===== CONTACT ===== */
+        .contact {
+            background: #f4f8fc;
+            padding: 80px 0;
+        }
+        .contact-grid {
+            display: flex;
+            gap: 50px;
+            flex-wrap: wrap;
+        }
+        .contact-info {
+            flex: 1;
+            min-width: 300px;
+        }
+        .contact-info h2 {
+            font-size: 36px;
+            color: #1e88e5;
+            margin-bottom: 20px;
+        }
+        .contact-info .info-line {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        .contact-info .info-line .icon {
+            font-size: 20px;
+            color: #34a853;
+        }
+        .map-placeholder {
+            flex: 1;
+            min-width: 300px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            height: 350px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #777;
+            font-size: 18px;
+        }
+
+        /* ===== FOOTER ===== */
+        footer {
+            background: #2c3e50;
+            color: #fff;
+            text-align: center;
+            padding: 30px 0;
+        }
+        footer p {
+            opacity: 0.8;
+            font-size: 14px;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            nav ul {
+                display: none;
+                flex-direction: column;
+                position: absolute;
+                top: 70px;
+                left: 0;
+                width: 100%;
+                background: #fff;
+                padding: 20px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                gap: 15px;
+                text-align: center;
+            }
+            nav ul.active {
+                display: flex;
+            }
+            .hamburger {
+                display: flex;
+            }
+            .hero h2 {
+                font-size: 32px;
+            }
+            .hero {
+                min-height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header>
+        <div class="container header-inner">
+            <a href="#home" class="logo">
+                <div class="logo-icon">✚</div>
+                <div class="logo-text">
+                    <h1>THE SR'S</h1>
+                    <span>HOSPITAL & TRAUMA CENTRE</span>
+                </div>
+            </a>
+            <nav>
+                <ul id="nav-menu">
+                    <li><a href="#home">Home</a></li>
+                    <li><a href="#about">About</a></li>
+                    <li><a href="#services">Services</a></li>
+                    <li><a href="#departments">Departments</a></li>
+                    <li><a href="#doctors">Doctors</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                    <li><a href="#appointment" class="btn-booking">Book Appointment</a></li>
+                </ul>
+            </nav>
+            <div class="hamburger" onclick="toggleMenu()">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero" id="home">
+        <div class="container">
+            <div class="hero-content">
+                <h2>Advanced Care, Compassionate Healing</h2>
+                <p>Welcome to THE SR'S HOSPITAL AND TRAUMA CENTRE – a trusted name in emergency & multi‑speciality healthcare, available 24/7.</p>
+                <a href="#appointment" class="btn-primary">Book an Appointment</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- STATS -->
+    <section class="stats">
+        <div class="container stats-grid">
+            <div class="stat-item">
+                <h3>24/7</h3>
+                <p>Emergency Support</p>
+            </div>
+            <div class="stat-item">
+                <h3>150+</h3>
+                <p>Specialist Doctors</p>
+            </div>
+            <div class="stat-item">
+                <h3>300+</h3>
+                <p>Bed Capacity</p>
+            </div>
+            <div class="stat-item">
+                <h3>25+</h3>
+                <p>Departments</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="about" id="about">
+        <div class="container">
+            <div class="about-grid">
+                <div class="about-image">
+                    <img src="https://images.unsplash.com/photo-1579684385127-1ef15d508118?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80" alt="Hospital building">
+                </div>
+                <div class="about-text">
+                    <h2>About Our Hospital</h2>
+                    <p>THE SR'S HOSPITAL AND TRAUMA CENTRE was established with a mission to provide world‑class medical care to every patient. We combine advanced technology with a warm, human touch.</p>
+                    <p>From critical trauma care to routine check‑ups, our experienced team of doctors, nurses, and support staff work together to ensure the best outcomes.</p>
+                    <p>We pride ourselves on being one of the region's leading healthcare providers, offering state‑of‑the‑art equipment, modern operation theatres, and dedicated ICUs.</p>
+                    <a href="#departments" class="btn-secondary">Explore Departments</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SERVICES -->
+    <section class="services" id="services">
+        <div class="container">
+            <div class="section-header">
+                <h2>Our Services</h2>
+                <p>Comprehensive care across every specialty – because your health comes first.</p>
+            </div>
+            <div class="services-grid">
+                <div class="service-card">
+                    <div class="icon">🚑</div>
+                    <h3>24/7 Emergency & Trauma</h3>
+                    <p>Round-the-clock accident & emergency care with advanced life support.</p>
+                </div>
+                <div class="service-card">
+                    <div class="icon">🩺</div>
+                    <h3>General Medicine</h3>
+                    <p>Expert diagnosis and treatment for a wide range of medical conditions.</p>
+                </div>
+                <div class="service-card">
+                    <div class="icon">🔬</div>
+                    <h3>Pathology & Lab</h3>
+                    <p>Fully automated diagnostic lab with quick, accurate reports.</p>
+                </div>
+                <div class="service-card">
+                    <div class="icon">💉</div>
+                    <h3>ICU & Critical Care</h3>
+                    <p>Advanced intensive care units monitored 24/7 by specialists.</p>
+                </div>
+                <div class="service-card">
+                    <div class="icon">👶</div>
+                    <h3>Maternity & Pediatrics</h3>
+                    <p>Safe delivery, newborn care, and child health services.</p>
+                </div>
+                <div class="service-card">
+                    <div class="icon">🦴</div>
+                    <h3>Orthopaedics</h3>
+                    <p>Comprehensive bone, joint, and spine care including surgeries.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- DEPARTMENTS -->
+    <section class="departments" id="departments">
+        <div class="container">
+            <div class="section-header">
+                <h2>Departments</h2>
+                <p>Our multi-speciality hospital hosts a wide range of medical departments.</p>
+            </div>
+            <div class="dept-list">
+                <div class="dept-item"><div class="dept-icon">❤️</div><span>Cardiology</span></div>
+                <div class="dept-item"><div class="dept-icon">🧠</div><span>Neurology</span></div>
+                <div class="dept-item"><div class="dept-icon">🫁</div><span>Pulmonology</span></div>
+                <div class="dept-item"><div class="dept-icon">🦷</div><span>Dental</span></div>
+                <div class="dept-item"><div class="dept-icon">👁️</div><span>Ophthalmology</span></div>
+                <div class="dept-item"><div class="dept-icon">👂</div><span>ENT</span></div>
+                <div class="dept-item"><div class="dept-icon">🩺</div><span>Dermatology</span></div>
+                <div class="dept-item"><div class="dept-icon">🦴</div><span>Orthopaedics</span></div>
+                <div class="dept-item"><div class="dept-icon">🚺</div><span>Gynaecology</span></div>
+                <div class="dept-item"><div class="dept-icon">👶</div><span>Pediatrics</span></div>
+                <div class="dept-item"><div class="dept-icon">🏥</div><span>Internal Medicine</span></div>
+                <div class="dept-item"><div class="dept-icon">💊</div><span>Pharmacy</span></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- DOCTORS -->
+    <section class="doctors" id="doctors">
+        <div class="container">
+            <div class="section-header">
+                <h2>Meet Our Doctors</h2>
+                <p>Highly qualified and experienced medical professionals committed to your well‑being.</p>
+            </div>
+            <div class="doctors-grid">
+                <div class="doctor-card">
+                    <div class="doctor-photo">👨‍⚕️</div>
+                    <div class="doctor-info">
+                        <h3>Dr. S. R. Sharma</h3>
+                        <span>Chief Surgeon & Director</span>
+                        <p>30+ years experience in general surgery.</p>
+                    </div>
+                </div>
+                <div class="doctor-card">
+                    <div class="doctor-photo">👩‍⚕️</div>
+                    <div class="doctor-info">
+                        <h3>Dr. Meera Patel</h3>
+                        <span>Head of Cardiology</span>
+                        <p>Expert in interventional cardiology.</p>
+                    </div>
+                </div>
+                <div class="doctor-card">
+                    <div class="doctor-photo">👨‍⚕️</div>
+                    <div class="doctor-info">
+                        <h3>Dr. Vikram Singh</h3>
+                        <span>Orthopaedic Surgeon</span>
+                        <p>Specialist in joint replacement & spine surgery.</p>
+                    </div>
+                </div>
+                <div class="doctor-card">
+                    <div class="doctor-photo">👩‍⚕️</div>
+                    <div class="doctor-info">
+                        <h3>Dr. Anjali Gupta</h3>
+                        <span>Head of Pediatrics</span>
+                        <p>Committed to child health & new born care.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- APPOINTMENT -->
+    <section class="appointment" id="appointment">
+        <div class="container">
+            <div class="appointment-grid">
+                <div class="appointment-form">
+                    <h2>Book an Appointment</h2>
+                    <form action="#" method="POST">
+                        <div class="form-group">
+                            <label for="name">Full Name</label>
+                            <input type="text" id="name" placeholder="Your Name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="phone">Phone Number</label>
+                            <input type="tel" id="phone" placeholder="+91 98765 43210" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" placeholder="you@example.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="dept">Department</label>
+                            <select id="dept">
+                                <option>General Medicine</option>
+                                <option>Cardiology</option>
+                                <option>Orthopaedics</option>
+                                <option>Pediatrics</option>
+                                <option>Gynecology</option>
+                                <option>Neurology</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="date">Preferred Date</label>
+                            <input type="date" id="date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="message">Message (Optional)</label>
+                            <textarea id="message" rows="4" placeholder="Briefly describe your symptoms or query..."></textarea>
+                        </div>
+                        <button type="submit" class="btn-submit">Submit Request</button>
+                    </form>
+                </div>
+                <div class="appointment-info">
+                    <h2>Why Choose Us?</h2>
+                    <div class="info-item">
+                        <div class="icon">⏰</div>
+                        <div>
+                            <h4>Immediate Attention</h4>
+                            <p>Quick appointments and minimal wait times.</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="icon">🏅</div>
+                        <div>
+                            <h4>Experienced Team</h4>
+                            <p>Specialists with international recognition.</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="icon">🛏️</div>
+                        <div>
+                            <h4>Patient Comfort</h4>
+                            <p>Private rooms, modern amenities, and caring staff.</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="icon">💳</div>
+                        <div>
+                            <h4>Affordable Care</h4>
+                            <p>Most insurance plans accepted; transparent pricing.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CONTACT -->
+    <section class="contact" id="contact">
+        <div class="container">
+            <div class="contact-grid">
+                <div class="contact-info">
+                    <h2>Contact Us</h2>
+                    <div class="info-line">
+                        <span class="icon">📍</span> 123, Health Road, Medicity, City – 400001
+                    </div>
+                    <div class="info-line">
+                        <span class="icon">📞</span> +91 98765 43210 | +91 22 4567 8900
+                    </div>
+                    <div class="info-line">
+                        <span class="icon">✉️</span> info@srs-hospital.com
+                    </div>
+                    <div class="info-line">
+                        <span class="icon">🌐</span> www.srs-hospital.com
+                    </div>
+                    <p style="margin-top:20px; color:#666;">For emergency, call our 24/7 help line: <strong style="color:#1e88e5;">108</strong> (ambulance).</p>
+                </div>
+                <div class="map-placeholder">
+                    🗺️ Google Map will appear here<br>
+                    (Replace with an iframe embed)
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 THE SR'S HOSPITAL AND TRAUMA CENTRE. All Rights Reserved.</p>
+        </div>
+    </footer>
+
+    <!-- MOBILE MENU TOGGLE -->
+    <script>
+        function toggleMenu() {
+            const menu = document.getElementById('nav-menu');
+            menu.classList.toggle('active');
+        }
+
+        // Close menu on link click (mobile)
+        document.querySelectorAll('#nav-menu a').forEach(link => {
+            link.addEventListener('click', () => {
+                document.getElementById('nav-menu').classList.remove('active');
+            });
+        });
+    </script>
+
+</body>
+</html>
